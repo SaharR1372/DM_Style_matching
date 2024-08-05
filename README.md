@@ -1,4 +1,4 @@
-The repository is based on [this repo](https://github.com/VICO-UoE/DatasetCondensation) Please cite their papers if you use the code. 
+The repository is based on [this repo](https://github.com/VICO-UoE/DatasetCondensation), please cite their papers if you use the code. 
 ## Usage
 
 ```
