@@ -1,6 +1,6 @@
-# Official PyTorch implementation of "Decomposed Distribution Matching in Dataset Condensation", published as a conference paper at WACV 2025.
+Official PyTorch implementation of **"Decomposed Distribution Matching in Dataset Condensation"**, published as a conference paper at WACV 2025.
 
-##Abstract
+# Abstract
 
 Dataset Condensation (DC) aims to reduce deep neural networks training efforts by synthesizing a small dataset such that it will be as effective as the original large dataset. Conventionally, DC relies on a costly bi-level optimization which prohibits its practicality. Recent research formulates DC as a distribution matching problem which circumvents the costly bi-level optimization. However, this efficiency sacrifices the DC performance.
    To investigate this performance degradation, we decomposed the dataset distribution into content and style. Our observations indicate two major shortcomings of: 1) style discrepancy between original and condensed data, and 2) limited intra-class diversity of condensed dataset.
