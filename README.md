@@ -8,7 +8,7 @@ Dataset Condensation (DC) aims to reduce deep neural networks training efforts b
    Moreover, we enhance the intra-class diversity by maximizing the Kullback–Leibler divergence within each synthetic class, \ie, content.
    We demonstrate the efficacy of our method through experiments on diverse datasets of varying size and resolution, achieving improvements of up to 8.3\% on CIFAR10, 7.9\% on CIFAR100, 3.6\% on TinyImageNet, 5\% on ImageNet-1K, 5.9\% on ImageWoof, 8.3\% on ImageNette, and 5.5\% in continual learning accuracy.
 
-![Proposed Method](proposedM.jpg)
+![Proposed Method](ProposedM.jpg)
 
 
 ## Usage
