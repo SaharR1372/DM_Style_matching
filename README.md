@@ -38,7 +38,9 @@ python DM_KNearest.py  --dataset CIFAR10  --model ConvNet  --ipc 10  --dsa_strat
 
 We provide various synthetic datasets (saved as tensors) with different numbers of images per class. You can access them [here](https://drive.google.com/drive/folders/1zq8YNzUoTd2N0kuGTZLwDjFuSCOo8Fih?usp=drive_link).
 
-The repository is based on [this repo](https://github.com/VICO-UoE/DatasetCondensation), please cite their paper [Dataset Condensation with Distribution Matching](https://arxiv.org/pdf/2110.04181) if you use the code. 
+This repository is built upon [this repo](https://github.com/VICO-UoE/DatasetCondensation). If you use the code or methods from this repository, please cite their work as well.
+
+<!--The repository is based on , please cite their paper [Dataset Condensation with Distribution Matching](https://arxiv.org/pdf/2110.04181) if you use the code.-->
 
 
 
