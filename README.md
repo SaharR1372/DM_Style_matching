@@ -10,14 +10,28 @@ Dataset Condensation (DC) aims to reduce deep neural networks training efforts b
 
 ![Proposed Method](ProposedM.jpg)
 
+## Setup
+Install packages in the requirement file.
+
 
 ## Usage
 
+To run distribution matching with Style Matching using Gram Matching, use the following command:
 ```
-python DM_GramMatching.py/DM_MeanStd_Matching.py  --dataset CIFAR10  --model ConvNet_gram  --ipc 10  --dsa_strategy color_crop_cutout_flip_scale_rotate  --init real   --Iteration 20000 --num_exp 5  --num_eval 5  --save_path result_cifar10_DM_StyleMatching   --style_ratio 10000
+python DM_GramMatching.py  --dataset CIFAR10  --model ConvNet_style  --ipc 10  --dsa_strategy color_crop_cutout_flip_scale_rotate  --init real   --Iteration 20000 --num_exp 5  --num_eval 5  --save_path result_cifar10_DM_StyleMatching   --style_ratio 10000
+# --dataset: CIFAR10, CIFAR100, TinyImageNet
+# --ipc (images/class): 1, 10, 20, 30, 40, 50
+#--model: ConvNet_style, ResNet18_style, AlexNet_style, VGG11_style
+```
 
+To run distribution matching with Style Matching using Moments Matching, use the following command:
+```
+python DM_MeanStd_Matching.py  --dataset CIFAR10  --model ConvNet_style  --ipc 10  --dsa_strategy color_crop_cutout_flip_scale_rotate  --init real   --Iteration 10000 --num_exp 5  --num_eval 5  --save_path result_cifar10_DM_StyleMatching   --style_ratio 10000
+```
+
+To run distribution matching while promoting intra-class diversity with Intra-Class Diversity, use the following command:
+```
 python DM_KNearest.py  --dataset CIFAR10  --model ConvNet  --ipc 10  --dsa_strategy color_crop_cutout_flip_scale_rotate  --init real   --Iteration 20000 --num_exp 5  --num_eval 5  --save_path result_cifar10_DM_KNearest --icd_ratio 10
-
 ```
 
 The repository is based on [this repo](https://github.com/VICO-UoE/DatasetCondensation), please cite their paper [Dataset Condensation with Distribution Matching](https://arxiv.org/pdf/2110.04181) if you use the code. 
