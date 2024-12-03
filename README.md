@@ -22,7 +22,7 @@ To run distribution matching with Style Matching (using Gram or Correlation Matc
 ```
 python DM_GramMatching.py  --dataset CIFAR10  --model ConvNet_style  --ipc 10  --dsa_strategy color_crop_cutout_flip_scale_rotate  --init real   --Iteration 20000 --num_exp 5  --num_eval 5  --save_path result_cifar10_DM_StyleMatching   --style_ratio 10000
 # --dataset: CIFAR10, CIFAR100, TinyImageNet
-# --ipc (images/class): 1, 10, 20, 30, 40, 50
+# --ipc (images/class): 1, 10, 50
 #--model: ConvNet_style, ResNet18_style, AlexNet_style, VGG11_style
 ```
 
