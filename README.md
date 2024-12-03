@@ -8,7 +8,9 @@ Dataset Condensation (DC) aims to reduce deep neural networks training efforts b
    Moreover, we enhance the intra-class diversity by maximizing the Kullback–Leibler divergence within each synthetic class, \ie, content.
    We demonstrate the efficacy of our method through experiments on diverse datasets of varying size and resolution, achieving improvements of up to 8.3\% on CIFAR10, 7.9\% on CIFAR100, 3.6\% on TinyImageNet, 5\% on ImageNet-1K, 5.9\% on ImageWoof, 8.3\% on ImageNette, and 5.5\% in continual learning accuracy.
 
+# Pipeline
 ![Proposed Method](ProposedM.jpg)
+Visualization of the proposed method, which includes a Style Matching (SM) module and Intra-Class Diversity (ICD) components. (b) SM module includes Moments Matching (MM) and Correlation Matching (CM) losses to reduce style discrepancies between real and condensed sets by using the \ie, mean and variance of feature maps as well as correlation among feature maps captured by the Gram matrix in a DNN across different layers. Meanwhile, the ICD component enhances diversity within condensed sets by pushing each condensed sample away from its $k$ nearest intra-class neighbors.
 
 ## Setup
 Install packages in the requirements file.
@@ -16,7 +18,7 @@ Install packages in the requirements file.
 
 ## Usage
 
-To run distribution matching with Style Matching (using Gram Matching loss), use the following command:
+To run distribution matching with Style Matching (using Gram or Correlation Matching loss), use the following command:
 ```
 python DM_GramMatching.py  --dataset CIFAR10  --model ConvNet_style  --ipc 10  --dsa_strategy color_crop_cutout_flip_scale_rotate  --init real   --Iteration 20000 --num_exp 5  --num_eval 5  --save_path result_cifar10_DM_StyleMatching   --style_ratio 10000
 # --dataset: CIFAR10, CIFAR100, TinyImageNet
