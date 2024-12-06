@@ -40,8 +40,7 @@ def main():
     parser.add_argument('--save_path', type=str, default='result', help='path to save results')
     parser.add_argument('--dis_metric', type=str, default='ours', help='distance metric')
     parser.add_argument('--style_ratio', type=int, default='1', help='style_ratio')
-    parser.add_argument('--kls', type=float, default=1.0, help='kl scaling factor')
-
+    
     args = parser.parse_args()
     args.method = 'DM'
     args.outer_loop, args.inner_loop = get_loops(args.ipc)
