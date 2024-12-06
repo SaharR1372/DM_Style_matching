@@ -39,10 +39,8 @@ def main():
     parser.add_argument('--data_path', type=str, default='data', help='dataset path')
     parser.add_argument('--save_path', type=str, default='result', help='path to save results')
     parser.add_argument('--dis_metric', type=str, default='ours', help='distance metric')
-    parser.add_argument('--subset', type=str, default='imagenette',
-                        help='ImageNet subset. This only does anything when --dataset=ImageNet')
-    parser.add_argument('--icd_ratio', type=float, default=1,
-                        help='ImageNet subset. This only does anything when --dataset=ImageNet')
+    parser.add_argument('--subset', type=str, default='imagenette', help='ImageNet subset. This only does anything when --dataset=ImageNet')
+    parser.add_argument('--icd_ratio', type=float, default=1, help='contribution of intra-class diversity loss')
 
 
     args = parser.parse_args()
@@ -96,8 +94,6 @@ def main():
             indices_class[lab].append(i)
         images_all = torch.cat(images_all, dim=0).to(args.device)
         labels_all = torch.tensor(labels_all, dtype=torch.long, device=args.device)
-
-
 
         for c in range(num_classes):
             print('class c = %d: %d real images'%(c, len(indices_class[c])))
