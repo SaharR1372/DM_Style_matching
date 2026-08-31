@@ -1,0 +1,27 @@
+# Style Matching alone: L_MMD + L_MM + L_CM, with the diversity module off.
+# This is the ablation that isolates the Style Matching module's contribution.
+# TinyImageNet, 10 images/class, on top of the released Style Matching settings.
+
+inherit: ../ours/_base.yaml
+name: sm_only_tinyimagenet_ipc10
+
+data:
+  dataset: TinyImageNet
+  ipc: 10
+
+condense:
+  iterations: 3000
+  num_exp: 2
+
+loss:
+  mm_ratio: 180.0
+  cm_ratio: 10000.0
+  icd:
+    content_ratio: 0.0
+
+eval:
+  models: [ConvNet]
+  num_eval: 5
+
+output:
+  save_path: runs/sm_only_tinyimagenet_ipc10

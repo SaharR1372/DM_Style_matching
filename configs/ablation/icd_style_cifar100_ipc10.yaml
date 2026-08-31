@@ -1,0 +1,28 @@
+# The style component of L_ICD instead of the content one: L_MMD + L_MM + L_CM
+# + L_SD.  An alternative to configs/ours, not an addition to it.
+# CIFAR100, 10 images/class, on top of the released Style Matching settings.
+
+inherit: ../ours/_base.yaml
+name: icd_style_cifar100_ipc10
+
+data:
+  dataset: CIFAR100
+  ipc: 10
+
+condense:
+  iterations: 10000
+  num_exp: 1
+
+loss:
+  mm_ratio: 180.0
+  cm_ratio: 10000.0
+  icd:
+    content_ratio: 0.0
+    style_ratio: 150.0
+
+eval:
+  models: [ConvNet]
+  num_eval: 10
+
+output:
+  save_path: runs/icd_style_cifar100_ipc10

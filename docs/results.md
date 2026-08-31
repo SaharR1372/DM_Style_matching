@@ -30,10 +30,10 @@ config declares, so a row can be reproduced with one command.
 | config | objective | accuracy (%) |
 | --- | --- | --- |
 | `configs/dm/cifar100_ipc10.yaml` | L_MMD only | 29.32 ± 0.29 |
-| `configs/paper` (CIFAR100) | L_MMD + L_MM + L_ICD(kl) | 26.23 ± 0.36 |
-| `sm_only` (CIFAR100) | L_MMD + L_MM + L_CM | **30.57 ± 0.37** |
+| `configs/paper/cifar100_ipc10.yaml` | L_MMD + L_MM + L_ICD(kl) | 26.23 ± 0.36 |
+| `configs/ablation/sm_only_cifar100_ipc10.yaml` | L_MMD + L_MM + L_CM | **30.57 ± 0.37** |
 | `configs/ours/cifar100_ipc10.yaml` | + L_CD *(released)* | 30.44 ± 0.17 |
-| `icd_style` (CIFAR100) | + L_SD | 30.33 ± 0.38 |
+| `configs/ablation/icd_style_cifar100_ipc10.yaml` | + L_SD | 30.33 ± 0.38 |
 
 ## TinyImageNet, 10 images/class
 
@@ -43,9 +43,9 @@ ConvNetD4, resolved automatically from the 64×64 resolution.
 | config | objective | accuracy (%) |
 | --- | --- | --- |
 | `configs/dm/tinyimagenet_ipc10.yaml` | L_MMD only | 14.19 ± 0.23 |
-| `sm_only` (TinyImageNet) | L_MMD + L_MM + L_CM | **14.87 ± 0.30** |
+| `configs/ablation/sm_only_tinyimagenet_ipc10.yaml` | L_MMD + L_MM + L_CM | **14.87 ± 0.30** |
 | `configs/ours/tinyimagenet_ipc10.yaml` | + L_CD *(released)* | 14.73 ± 0.40 |
-| `icd_style` (TinyImageNet) | + L_SD | 13.22 ± 0.34 |
+| `configs/ablation/icd_style_tinyimagenet_ipc10.yaml` | + L_SD | 13.22 ± 0.34 |
 
 ## Other CIFAR10 budgets
 
