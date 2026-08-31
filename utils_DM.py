@@ -6,8 +6,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset
 from torchvision import datasets, transforms
-from scipy.ndimage.interpolation import rotate as scipyrotate
-from networks_DM import MLP, ConvNet,ConvNet_style, LeNet, AlexNet,AlexNet_style, VGG11,VGG11_style, VGG11BN, ResNet18,ResNet18_style,ResNet18_gram_groupNorm ResNet18BN
+try:
+    from scipy.ndimage import rotate as scipyrotate
+except ImportError:  # scipy < 1.10
+    from scipy.ndimage.interpolation import rotate as scipyrotate
+from networks_DM import MLP, ConvNet, ConvNet_style, LeNet, AlexNet, AlexNet_style, VGG11, VGG11_style, VGG11BN, ResNet18, ResNet18_style, ResNet18BN
 
 from PIL import Image
 
@@ -87,32 +90,6 @@ class ImageNetDataset(Dataset):
         return image, label
 
 
-
-class DistillLoss(nn.Module):
-    def __init__(self, args, device):
-        super(DistillLoss, self).__init__()
-        self.device = device
-        self.args = args
-        self.criterion = self.cosine_loss
-        self.distill_attn_param=1
-
-    def cosine_loss(self, l, h):
-        l = l.view(l.size(0), -1)
-        h = h.view(h.size(0), -1)
-        return torch.mean(1.0 - F.cosine_similarity(l, h))
-
-    def forward(self, low_feature, high_feature):
-        # calculate the attention distillation
-        loss_sum = 0.
-        for l, h in zip(low_feature, high_feature):
-            l = l.reshape(l.size(0), -1)
-            h = h.reshape(h.size(0), -1)
-
-            d_loss = self.criterion(l, h)
-
-            loss_sum += d_loss * self.distill_attn_param
-
-        return loss_sum
 
 # def get_dataset(dataset, data_path, batch_size=1, subset="imagenette", args=None):
 def get_dataset(dataset, data_path):
@@ -242,18 +219,28 @@ def get_default_convnet_setting():
 
 
 
-def get_network(model, channel, num_classes, im_size=(32, 32)):
+def get_network(model, channel, num_classes, im_size=(32, 32), net_depth=None):
+    """Build an architecture by name.
+
+    net_depth overrides the default ConvNet depth (3).  The DM literature evaluates
+    64x64 datasets such as TinyImageNet on ConvNetD4, so a caller working at that
+    resolution should pass net_depth=4; leaving it None reproduces the previous
+    behaviour exactly at every call site.
+    """
     torch.random.manual_seed(int(time.time() * 1000) % 100000)
-    net_width, net_depth, net_act, net_norm, net_pooling = get_default_convnet_setting()
+    net_width, default_depth, net_act, net_norm, net_pooling = get_default_convnet_setting()
+    net_depth = default_depth if net_depth is None else int(net_depth)
 
     if model == 'MLP':
         net = MLP(channel=channel, num_classes=num_classes)
     elif model == 'ConvNet':
         net = ConvNet(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=net_depth, net_act=net_act, net_norm=net_norm, net_pooling=net_pooling, im_size=im_size)
 
-    elif model == 'ConvNet_gram':  # ConvNet_Dense
-        net = ConvNet_gram(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=net_depth,
-                      net_act=net_act, net_norm=net_norm, net_pooling=net_pooling, im_size=im_size)
+    elif model == 'ConvNet_style':
+        # This case was missing, so `--model ConvNet_style` -- the model every style
+        # matching command in the README asks for -- exited with 'unknown model'.
+        net = ConvNet_style(channel=channel, num_classes=num_classes, net_width=net_width, net_depth=net_depth,
+                            net_act=net_act, net_norm=net_norm, net_pooling=net_pooling, im_size=im_size)
 
     elif model == 'LeNet':
         net = LeNet(channel=channel, num_classes=num_classes)
@@ -272,9 +259,7 @@ def get_network(model, channel, num_classes, im_size=(32, 32)):
     elif model == 'ResNet18':
         net = ResNet18(channel=channel, num_classes=num_classes)
     elif model == 'ResNet18_style':
-        net = ResNet18_gram(channel=channel, num_classes=num_classes)
-    elif model == 'ResNet18_gramBasic2':
-        net = ResNet18_gramBasic2(channel=channel, num_classes=num_classes)
+        net = ResNet18_style(channel=channel, num_classes=num_classes)  # was ResNet18_gram, undefined
     elif model == 'ResNet18BN_AP':
         net = ResNet18BN_AP(channel=channel, num_classes=num_classes)
     elif model == 'ResNet18BN':
@@ -874,17 +859,376 @@ def gram_matrix(x, should_normalize=True):
     return gram  # Output size: (batch, channels, channels), capturing channel correlations
 
 
-def KL_divergence(p, q):
-    return torch.sum(p * torch.log(p / q))
+# ---------------------------------------------------------------------------
+# Intra-Class Diversity (ICD).
+#
+# The ICD module enhances diversity within each condensed class.  Two formulations
+# live here:
+#
+#   intra_class_diversity_loss      the released form -- BOUNDED and target-matched,
+#                                   composed of a style and a content component (below).
+#   intra_class_diversity_loss_kl   the Eq. 8-9 form -- unbounded KL repulsion, kept so
+#                                   the published objective can still be reproduced.
+#
+# See `intra_class_diversity_loss` for why the released form is the one to use.
+# ---------------------------------------------------------------------------
+
+def icd_k_for_ipc(ipc):
+    """k = 0.2 x IPC nearest intra-class neighbours, at least 1 and at most ipc-1."""
+    if ipc < 2:
+        return 0
+    return int(max(1, min(ipc - 1, round(0.2 * ipc))))
 
 
-def gram_matrix_spatial(x, should_normalize=True):
-    (b, ch, h, w) = x.size()
-    features = x.view(b, h * w, ch)  # Reshape to (batch, spatial, channels)
-    features_t = features.transpose(1, 2)  # Transpose to (batch, channels, spatial)
-    gram = features.bmm(features_t)  # Batch matrix multiplication
+def intra_class_diversity_loss_kl(feat, k=None, ipc=None, eps=1e-8):
+    """Eq. 8-9 of the paper: maximise KL divergence to the k nearest intra-class neighbours.
 
-    if should_normalize:
-        gram /= ch * h * w
+    For every synthetic sample x~ of the class we take the mean embedding m of its k
+    nearest intra-class neighbours and *maximise* KL( S(phi(x~)) || S(m) ), which is
+    returned here with a negative sign so it can be added to a minimised objective.
 
-    return gram  # Output size: (b, h*w, h*w), capturing spatial correlations
+    SUPERSEDED by `intra_class_diversity_loss`, and retained only so the published
+    objective can be reproduced exactly.  This form maximises a divergence, so it is
+    unbounded below and has no attainable optimum: the descent direction never
+    terminates and past a moderate weight the term simply overwhelms the content
+    matching, driving the intra-class scatter far past anything present in the real
+    data.  Prefer the released bounded form for any new work.
+
+    Args:
+        feat: (n, d) embeddings of one class's synthetic samples.
+        k:    number of neighbours; if None it is derived from ``ipc`` (or n) as 0.2*IPC.
+        ipc:  images per class, used only to derive k.
+
+    Returns:
+        Scalar tensor, 0 when the class holds fewer than two samples.
+    """
+    n = feat.shape[0]
+    if k is None:
+        k = icd_k_for_ipc(ipc if ipc is not None else n)
+    k = int(min(max(k, 0), n - 1)) if n > 1 else 0
+    if k < 1:
+        return feat.sum() * 0.0
+
+    # k nearest intra-class neighbours by squared L2 in feature space (Eq. 9).
+    with torch.no_grad():
+        d2 = torch.cdist(feat, feat, p=2) ** 2
+        d2.fill_diagonal_(float('inf'))
+        nn_idx = torch.topk(d2, k, dim=1, largest=False).indices  # (n, k)
+
+    m = feat[nn_idx].mean(dim=1)                      # (n, d) neighbourhood centroid
+    log_p = F.log_softmax(feat, dim=1)
+    log_q = F.log_softmax(m, dim=1)
+    kl = (log_p.exp() * (log_p - log_q)).sum(dim=1)   # KL( S(phi(x~)) || S(m) )
+    return -kl.sum()
+
+
+# ---------------------------------------------------------------------------
+# Style statistics.
+# ---------------------------------------------------------------------------
+
+def style_vector(feat, eps=1e-5):
+    """Per-sample channel-wise style descriptor of a feature map.
+
+    Args:
+        feat: (N, C, H, W)
+    Returns:
+        mu, sd: (N, C) each -- the spatial mean and std of every channel of every sample.
+    """
+    n, c = feat.shape[:2]
+    x = feat.reshape(n, c, -1)
+    mu = x.mean(dim=2)
+    sd = (x.var(dim=2, unbiased=False) + eps).sqrt()
+    return mu, sd
+
+
+def _sq_diff(a, b, relative, eps=1e-8):
+    """Mean squared difference, optionally divided by the magnitude of the target.
+
+    The relative form makes the term invariant to the scale of the feature maps, which
+    matters once the style is read before normalisation: there the magnitudes depend on
+    the random initialisation and grow with depth, so an absolute loss silently weights
+    the layers by their activation scale and its coefficient has to be retuned for every
+    tap, architecture and dataset.
+    """
+    num = (a - b).pow(2).mean()
+    if not relative:
+        return num
+    return num / (b.detach().pow(2).mean() + eps)
+
+
+def moments_matching_loss(feat_syn, feat_real, mode='persample', relative=False, eps=1e-5):
+    """First/second-moment style matching between a synthetic and a real feature map.
+
+    mode='batchavg' reproduces the published implementation: the feature maps are
+        averaged over the batch first and the spatial mean/std of that average are
+        compared.  Because the spatial variance of a batch-average shrinks with the
+        batch size, the target computed from ``batch_real`` real images is not on the
+        same scale as the value computed from ``ipc`` synthetic images.
+    mode='persample' compares E_x[mu(x)] and E_x[sd(x)] instead, which are sample means
+        of a per-sample quantity and therefore unbiased with respect to the batch size.
+    """
+    if mode == 'batchavg':
+        s = torch.mean(feat_syn, dim=0, keepdim=True)
+        r = torch.mean(feat_real, dim=0, keepdim=True)
+        s_mu, s_sd = calc_mean_std(s, eps)
+        r_mu, r_sd = calc_mean_std(r, eps)
+        return (_sq_diff(s_mu, r_mu, relative) + _sq_diff(s_sd, r_sd, relative)) / 2
+
+    s_mu, s_sd = style_vector(feat_syn, eps)
+    r_mu, r_sd = style_vector(feat_real, eps)
+    return (_sq_diff(s_mu.mean(0), r_mu.mean(0), relative)
+            + _sq_diff(s_sd.mean(0), r_sd.mean(0), relative)) / 2
+
+
+def style_diversity_loss(feat_syn, feat_real, relative=False, eps=1e-5):
+    """Match the *spread* of the per-sample style descriptors (the new SD term).
+
+    L_MMD matches where the content sits, L_MM/L_CM match where the style sits and
+    L_ICD spreads the content out.  The remaining cell of that 2x2 is the spread of the
+    style, which nothing in the published objective supervises: within a class the
+    condensed samples end up sharing one style while the real samples span a range of
+    them.  Here that spread is *matched* to the real one rather than maximised, so the
+    real data sets the target and no repulsion strength has to be tuned.
+
+    Both sides use the unbiased (n-1) estimator so that ``ipc`` synthetic samples and
+    ``batch_real`` real samples give comparable values, and the comparison is made in
+    std space so this term shares the scale of ``moments_matching_loss``.
+    """
+    if feat_syn.shape[0] < 2 or feat_real.shape[0] < 2:
+        return feat_syn.sum() * 0.0
+    s_mu, s_sd = style_vector(feat_syn, eps)
+    r_mu, r_sd = style_vector(feat_real, eps)
+    # across-sample std of each style coordinate, per channel
+    s_v_mu = (s_mu.var(dim=0, unbiased=True) + eps).sqrt()
+    r_v_mu = (r_mu.var(dim=0, unbiased=True) + eps).sqrt()
+    s_v_sd = (s_sd.var(dim=0, unbiased=True) + eps).sqrt()
+    r_v_sd = (r_sd.var(dim=0, unbiased=True) + eps).sqrt()
+    return (_sq_diff(s_v_mu, r_v_mu, relative) + _sq_diff(s_v_sd, r_v_sd, relative)) / 2
+
+
+def correlation_matching_loss(feat_syn, feat_real):
+    """Gram-matrix (channel correlation) matching, L_CM of the paper."""
+    g_s = gram_matrix(feat_syn).mean(dim=0)
+    g_r = gram_matrix(feat_real).mean(dim=0)
+    return nn.MSELoss(reduction='sum')(g_s, g_r)
+
+
+# ---------------------------------------------------------------------------
+# Components of the released L_ICD, plus two screened-and-rejected candidates.
+#
+# L_ICD maximises a KL divergence, so it has no finite optimum: past some beta it simply
+# overwhelms the content loss (measured in FINDINGS.md -- it saturates near -25 while the
+# content loss stalls).  Both losses below apply the same "spread the class out" pressure
+# but are bounded and self-calibrating, so the real data decides how much spread is right.
+# ---------------------------------------------------------------------------
+
+def intra_class_coverage_loss(feat_syn, feat_real, temp=0.1, eps=1e-8):
+    """Normalised quantisation error of the real class by the synthetic samples (L_ICC).
+
+    Treats the ipc synthetic samples of a class as a codebook and measures how well they
+    cover the real class distribution:
+
+        L_ICC = E_x[ min_j || phi(x) - phi(x~_j) ||^2 ]  /  E_x[ || phi(x) - mu ||^2 ]
+
+    The denominator is the total intra-class variance of the real data, so the ratio is
+    dimensionless and reads directly as a fraction of unexplained variance:
+
+      * every synthetic sample collapsed onto the class mean  ->  L_ICC = 1 (the worst case,
+        and exactly the degenerate solution that L_MMD alone permits);
+      * synthetic samples sitting at the k-means centroids of the class  ->  the normalised
+        k-means distortion, well below 1.
+
+    So unlike L_ICD it is bounded, it has a finite optimum, and it needs no tuning to decide
+    how far apart the samples should be -- covering the class is the objective, and spread is
+    what covering requires.  Minimising it is one Lloyd step per iteration: each synthetic
+    sample is pulled towards the centroid of the real samples assigned to it.
+
+    ---------------------------------------------------------------------------------------
+    MEASURED AND REJECTED -- kept for the record, do not use as a diversity term.
+    diagnostics/diag_icc_props.py shows this loss *increases* from 1.098 at full collapse to
+    1.579 at the spread of a real ipc-sized subset, i.e. its minimum is at collapse and
+    optimising it would cause the very failure it was meant to fix.  The reason is
+    dimensional: with ipc=10 codebook points in a 2048-dimensional embedding, squared
+    quantisation error is minimised by placing every point at the class centroid, and spread
+    out points sit in the shell of the distribution where they score worse.  Coverage by
+    quantisation is the wrong tool at this ipc; use ``content_diversity_loss`` instead, which
+    does have its minimum at the real spread.
+    ---------------------------------------------------------------------------------------
+
+    Assignment responsibilities are computed without gradient (an EM / Lloyd update).  A soft
+    assignment is used rather than a hard argmin so that a synthetic sample which is currently
+    nearest to no real sample still receives gradient instead of going dead; ``temp`` is
+    relative to the mean squared distance, and temp -> 0 recovers hard k-means.
+
+    Args:
+        feat_syn:  (n_s, d) synthetic embeddings of one class.
+        feat_real: (n_r, d) real embeddings of the same class (no gradient expected).
+    """
+    if feat_syn.shape[0] < 1 or feat_real.shape[0] < 2:
+        return feat_syn.sum() * 0.0
+
+    d2 = torch.cdist(feat_real, feat_syn, p=2) ** 2          # (n_r, n_s)
+    with torch.no_grad():
+        if temp <= 0:
+            resp = torch.zeros_like(d2).scatter_(1, d2.argmin(dim=1, keepdim=True), 1.0)
+        else:
+            tau = temp * d2.mean().clamp_min(eps)
+            resp = torch.softmax(-d2 / tau, dim=1)
+    distortion = (resp * d2).sum(dim=1).mean()
+
+    with torch.no_grad():
+        spread = (feat_real - feat_real.mean(dim=0, keepdim=True)).pow(2).sum(dim=1).mean()
+    return distortion / (spread + eps)
+
+
+def between_class_loss(mu_syn, mu_real, relative=True, eps=1e-8):
+    """Match the *between-class* geometry of the condensed set to the real data.
+
+    Every other term in this codebase -- L_MMD, L_MM, L_CM, L_SD, L_CD, L_ICD -- is computed
+    inside a single class.  DM's objective is a sum of independent per-class mean-matching
+    problems and never constrains how the classes sit relative to one another.  That is the
+    one structural axis the whole sweep left untouched, which is why it is worth one test.
+
+    diagnostics/diag_floor.py showed the per-class mean matching is essentially finished (the
+    condensed set matches its class mean 6.5x better than ten real images do), but "finished"
+    is per class: a residual of ~43 summed over classes still leaves the *arrangement* of the
+    class means free to drift, and a classifier cares about exactly that arrangement.
+
+    Matches the matrix of pairwise squared distances between class-mean embeddings, normalised
+    by the real matrix's magnitude so the weight is scale-free -- the same construction as
+    L_SD and L_CD, and for the same reason: the target is read off the real data, so the
+    optimum is attainable and interior rather than a direction of unbounded descent.
+
+    mu_syn / mu_real: (K, D) class-mean embeddings, K classes.  mu_real is expected detached.
+    """
+    if mu_syn.shape[0] < 2:
+        return mu_syn.sum() * 0.0
+    d_s = torch.cdist(mu_syn, mu_syn, p=2) ** 2
+    d_r = torch.cdist(mu_real, mu_real, p=2) ** 2
+    num = (d_s - d_r).pow(2).mean()
+    if not relative:
+        return num
+    return num / (d_r.detach().pow(2).mean() + eps)
+
+
+def content_diversity_loss(feat_syn, feat_real, rank=0, eps=1e-8):
+    """Match the intra-class spread of the content along the real class's principal axes.
+
+    The content analogue of ``style_diversity_loss``: where L_ICD pushes samples apart
+    without a target, this matches how far apart they should be, and does so per direction
+    rather than isotropically.
+
+        L_CD = mean_k ( std(S v_k) - std(R v_k) )^2  /  mean_k std(R v_k)^2
+
+    with v_k the top-``rank`` principal directions of the real class, computed from the real
+    batch without gradient.  Matching a full covariance is impossible here -- ipc synthetic
+    samples span at most ipc-1 dimensions of a 2048-dimensional embedding -- so the rank is
+    capped at ipc-1, which is exactly the number of variances the synthetic set has the
+    degrees of freedom to set.
+
+    Args:
+        rank: number of principal directions; 0 selects min(n_s - 1, 16).
+    """
+    n_s, n_r = feat_syn.shape[0], feat_real.shape[0]
+    if n_s < 2 or n_r < 2:
+        return feat_syn.sum() * 0.0
+    r = rank if rank > 0 else min(n_s - 1, 16)
+    r = int(min(r, n_s - 1, n_r - 1, feat_real.shape[1]))
+    if r < 1:
+        return feat_syn.sum() * 0.0
+
+    with torch.no_grad():
+        # top-r principal directions of the real class (real data only, so no gradient)
+        _, _, v = torch.pca_lowrank(feat_real, q=min(r + 6, n_r, feat_real.shape[1]), niter=2)
+        v = v[:, :r]                                          # (d, r)
+        r_std = (feat_real - feat_real.mean(0, keepdim=True)).mm(v).std(dim=0, unbiased=True)
+
+    s_std = (feat_syn - feat_syn.mean(0, keepdim=True)).mm(v).std(dim=0, unbiased=True)
+    return (s_std - r_std).pow(2).mean() / (r_std.pow(2).mean() + eps)
+
+
+# ---------------------------------------------------------------------------
+# The released Intra-Class Diversity loss.
+# ---------------------------------------------------------------------------
+
+def intra_class_diversity_loss(emb_syn, emb_real, feat_syn=None, feat_real=None,
+                               content_ratio=1.0, style_ratio=0.0, rank=0,
+                               relative=True, eps=1e-8, return_parts=False):
+    """L_ICD -- intra-class diversity, in a bounded and target-matched form.
+
+    The ICD module of the paper enhances diversity within each condensed class, so that
+    the ipc synthetic images of a class span the class the way real images of that class
+    do instead of collapsing onto a single prototype.  This is the released
+    implementation of that module, and it is built from two components:
+
+        L_ICD = content_ratio * L_CD  +  style_ratio * L_SD
+
+      L_CD  ``content_diversity_loss``  -- matches the intra-class spread of the final
+            embedding along the principal directions of the real class.  This is the
+            content axis, and is the direct counterpart of the module as described in
+            the paper.
+      L_SD  ``style_diversity_loss``    -- matches the across-sample spread of the
+            per-sample style descriptors of the intermediate feature maps.  This is the
+            style axis, and is off by default (see the note on redundancy below).
+
+    Why this replaces the KL-repulsion formulation
+    ----------------------------------------------
+    `intra_class_diversity_loss_kl` implements Eq. 8-9 by *maximising* a divergence
+    between each sample and its k nearest intra-class neighbours.  Maximising an
+    unbounded quantity gives the term no attainable optimum: its descent direction never
+    terminates, so there is no weight at which it both spreads the samples and stops.  In
+    practice it keeps pushing until it dominates the content matching and disperses the
+    class well beyond the spread of the real data.
+
+    Both components here are built the opposite way.  Each compares a synthetic statistic
+    against the *same statistic measured on the real batch*, so the loss is bounded below
+    by zero, is minimised exactly where the condensed class has the spread of the real
+    class, and rises again if the class is pushed wider than the data.  The target is read
+    off the data rather than set by a coefficient, and because both are normalised by the
+    magnitude of their own target they are scale-free: one weight transfers across taps,
+    architectures, resolutions and datasets without retuning.
+
+    On the two components
+    ---------------------
+    The two axes are largely redundant -- both constrain second-order intra-class
+    structure, so they compete for the same headroom rather than adding.  The default
+    therefore activates the content component alone, which is the axis the paper's module
+    describes.  Set ``style_ratio`` to enable the style component; it is a viable
+    alternative to the content one, not an addition to it.
+
+    Measured scope.  Against a style-matching control, the content component is neutral at
+    every resolution tested (-0.08 on CIFAR10, -0.13 on CIFAR100, -0.14 on TinyImageNet, all
+    inside the error bars).  The style component is harmless at 32x32 but costs 1.65 points
+    at 64x64, where it falls below the plain distribution-matching baseline; enabling it is
+    not recommended above 32x32.
+
+    Args:
+        emb_syn:   (n_s, d) embeddings of one class's synthetic samples.
+        emb_real:  (n_r, d) embeddings of the same class's real samples (detached).
+        feat_syn:  optional sequence of (n_s, C, H, W) style feature maps, required only
+                   when ``style_ratio`` is non-zero.
+        feat_real: the matching real feature maps.
+        content_ratio / style_ratio: weights of the two components.
+        rank:      principal directions matched by L_CD; 0 selects min(ipc - 1, 16).
+        relative:  normalise the style component by the magnitude of its target.
+        return_parts: also return the unweighted value of each component, for logging.
+
+    Returns:
+        Scalar tensor (the weighted sum), 0 when the class holds fewer than two synthetic
+        samples -- a single sample has no across-sample spread, so no diversity term can
+        act at ipc = 1.  With return_parts=True, returns (loss, {'content':.., 'style':..})
+        where the dict holds the unweighted component values as floats.
+    """
+    loss = emb_syn.sum() * 0.0
+    parts = {'content': 0.0, 'style': 0.0}
+    if content_ratio:
+        l_cd = content_diversity_loss(emb_syn, emb_real, rank=rank, eps=eps)
+        loss = loss + content_ratio * l_cd
+        parts['content'] = float(l_cd)
+    if style_ratio and feat_syn is not None and feat_real is not None:
+        sd = [style_diversity_loss(a, b, relative=relative) for a, b in zip(feat_syn, feat_real)]
+        if sd:
+            l_sd = sum(sd) / len(sd)
+            loss = loss + style_ratio * l_sd
+            parts['style'] = float(l_sd)
+    return (loss, parts) if return_parts else loss
