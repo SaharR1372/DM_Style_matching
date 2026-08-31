@@ -1,0 +1,11 @@
+# datasets and training outputs
+data/
+runs/
+result*/
+
+# private research material: diagnostics, experiment infrastructure,
+# findings and thesis notes. Not part of the released method.
+private/
+
+__pycache__/
+*.pyc
