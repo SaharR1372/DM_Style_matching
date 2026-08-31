@@ -1,85 +1,172 @@
-Official PyTorch implementation of **"Decomposed Distribution Matching in Dataset Condensation"**, published as a conference paper at WACV 2025.
+# Decomposed Distribution Matching in Dataset Condensation
 
-# Abstract
+Official PyTorch implementation of **"Decomposed Distribution Matching in Dataset
+Condensation"**, published at **WACV 2025**.
 
-Dataset Condensation (DC) aims to reduce deep neural networks training efforts by synthesizing a small dataset such that it will be as effective as the original large dataset. Conventionally, DC relies on a costly bi-level optimization which prohibits its practicality. Recent research formulates DC as a distribution matching problem which circumvents the costly bi-level optimization. However, this efficiency sacrifices the DC performance.
-   To investigate this performance degradation, we decomposed the dataset distribution into content and style. Our observations indicate two major shortcomings of: 1) style discrepancy between original and condensed data, and 2) limited intra-class diversity of condensed dataset.
-   We present a simple yet effective method to match the style information between original and condensed data, employing statistical moments of feature maps as well-established style indicators.
-   Moreover, we enhance the intra-class diversity by maximizing the Kullback–Leibler divergence within each synthetic class, i.e., content.
-   We demonstrate the efficacy of our method through experiments on diverse datasets of varying size and resolution, achieving improvements of up to 8.3\% on CIFAR10, 7.9\% on CIFAR100, 3.6\% on TinyImageNet, 5\% on ImageNet-1K, 5.9\% on ImageWoof, 8.3\% on ImageNette, and 5.5\% in continual learning accuracy.
+## Abstract
 
-# Pipeline
+Dataset Condensation (DC) aims to reduce deep neural networks training efforts by
+synthesizing a small dataset such that it will be as effective as the original large
+dataset. Conventionally, DC relies on a costly bi-level optimization which prohibits its
+practicality. Recent research formulates DC as a distribution matching problem which
+circumvents the costly bi-level optimization. However, this efficiency sacrifices the DC
+performance.
+To investigate this performance degradation, we decomposed the dataset distribution into
+content and style. Our observations indicate two major shortcomings of: 1) style discrepancy
+between original and condensed data, and 2) limited intra-class diversity of condensed
+dataset.
+We present a simple yet effective method to match the style information between original and
+condensed data, employing statistical moments of feature maps as well-established style
+indicators.
+Moreover, we enhance the intra-class diversity by maximizing the Kullback–Leibler divergence
+within each synthetic class, i.e., content.
+We demonstrate the efficacy of our method through experiments on diverse datasets of varying
+size and resolution, achieving improvements of up to 8.3% on CIFAR10, 7.9% on CIFAR100, 3.6%
+on TinyImageNet, 5% on ImageNet-1K, 5.9% on ImageWoof, 8.3% on ImageNette, and 5.5% in
+continual learning accuracy.
+
+## Pipeline
+
 ![Proposed Method](ProposedM.jpg)
-Visualization of the proposed method, which includes a Style Matching (SM) module and Intra-Class Diversity (ICD) components. (b) SM module includes Moments Matching (MM) and Correlation Matching (CM) losses to reduce style discrepancies between real and condensed sets by using the i.e., mean and variance of feature maps as well as correlation among feature maps captured by the Gram matrix in a DNN across different layers. Meanwhile, the ICD component enhances diversity within condensed sets by pushing each condensed sample away from its $k$ nearest intra-class neighbors.
 
-## Setup
-Install packages in the requirements file.
+The proposed method comprises a **Style Matching (SM)** module and an **Intra-Class
+Diversity (ICD)** component. (b) The SM module includes Moments Matching (MM) and Correlation
+Matching (CM) losses, which reduce the style discrepancy between the real and the condensed
+set using the mean and variance of feature maps as well as the correlation among feature maps
+captured by the Gram matrix across layers of a DNN. The ICD component enhances diversity
+within each condensed class.
 
+---
+
+## Install
+
+```bash
+pip install -r requirements.txt
+```
+
+Tested with Python 3.11 and PyTorch 2.x on CUDA. Datasets download themselves on first use;
+TinyImageNet and ImageNet need one preparation step, described in
+[docs/datasets.md](docs/datasets.md).
 
 ## Usage
 
-### Full method
+Everything is one command with one config file.
 
-`DM_DDM.py` runs the complete objective -- content matching, the Style Matching module
-(Moments Matching + Correlation Matching) and the Intra-Class Diversity module -- from a
-single entry point:
+```bash
+# the released method
+python train.py --config configs/ours/cifar10_ipc10.yaml
 
-```
-python DM_DDM.py --preset ours --dataset CIFAR10 --ipc 10 --model ConvNet_style \
-    --dsa_strategy color_crop_cutout_flip_scale_rotate --init real \
-    --Iteration 20000 --num_exp 3 --num_eval 10 --save_path result_cifar10_ours
-# --dataset: CIFAR10, CIFAR100, TinyImageNet
-# --ipc (images/class): 1, 10, 50
-# --model:  ConvNet_style, ResNet18_style, AlexNet_style, VGG11_style
-```
+# the distribution-matching baseline
+python train.py --config configs/dm/cifar10_ipc10.yaml
 
-Presets: `dm` (plain distribution matching, the baseline), `paper` (the objective as
-specified in the paper), `ours` (the released configuration). Individual terms are
-controlled by `--mm_ratio`, `--cm_ratio`, `--icd_ratio` and `--icd_style_ratio`, so any
-ablation is a flag combination; `--net_depth` defaults to ConvNetD4 at 64x64 (TinyImageNet)
-and ConvNetD3 at 32x32.
+# a coreset baseline
+python train.py --config configs/coreset/cifar10_ipc10_herding.yaml
 
-### Individual modules
-
-Each module of the pipeline also has its own script, matching the figure above.
-
-Style Matching, correlation (Gram) form:
-```
-python DM_GramMatching.py  --dataset CIFAR10  --model ConvNet_style  --ipc 10  --dsa_strategy color_crop_cutout_flip_scale_rotate  --init real   --Iteration 20000 --num_exp 5  --num_eval 5  --save_path result_cifar10_DM_StyleMatching   --style_ratio 10000
+# evaluate a set you already built, on architectures it was not condensed on
+python evaluate.py --config configs/eval/cross_arch.yaml \
+    --checkpoint runs/ours_cifar10_ipc10/condensed_CIFAR10_ConvNet_style_10ipc.pt
 ```
 
-Style Matching, moments form:
-```
-python DM_MeanStd_Matching.py  --dataset CIFAR10  --model ConvNet_style  --ipc 10  --dsa_strategy color_crop_cutout_flip_scale_rotate  --init real   --Iteration 10000 --num_exp 5  --num_eval 5  --save_path result_cifar10_DM_StyleMatching   --style_ratio 10000
+Anything in a config can be overridden for a quick experiment:
+
+```bash
+python train.py --config configs/ours/cifar10_ipc10.yaml \
+    --set data.ipc=50 condense.iterations=5000 output.save_path=runs/quick
 ```
 
-Intra-Class Diversity:
+A run writes its resolved config, log, image grid, checkpoint and a `results.json` row into
+`output.save_path`. `python scripts/collect_results.py runs` renders every row it finds as a
+markdown table.
+
+## Configs
+
 ```
-python DM_KNearest.py  --dataset CIFAR10  --model ConvNet  --ipc 10  --dsa_strategy color_crop_cutout_flip_scale_rotate  --init real   --Iteration 20000 --num_exp 5  --num_eval 5  --save_path result_cifar10_DM_KNearest --icd_ratio 30
+configs/
+    base.yaml               defaults shared by every method
+    dm/                     plain distribution matching -- the baseline
+    ours/                   the released method
+    paper/                  the objective exactly as published, for reproduction
+    ablation/               one term at a time: mm_only, cm_only, sm_only, icd_only, ...
+    coreset/                the eight coreset selectors
+    eval/                   evaluation-only protocols, including cross-architecture
 ```
 
-### Note on the Intra-Class Diversity implementation
+Configs compose with `inherit:`, so a method config only states what it changes. Every key
+is documented in [docs/configs.md](docs/configs.md).
+
+Available budgets and datasets: `data.ipc` ∈ {1, 10, 50, ...}; `data.dataset` ∈ {MNIST,
+FashionMNIST, SVHN, CIFAR10, CIFAR100, TinyImageNet, ImageNet}; `model.arch` ∈
+{ConvNet, ConvNet_style, AlexNet, VGG11, ResNet18, ...} and their `_style` variants.
+
+## Coreset baselines
+
+Eight classical selection methods share the budget and the evaluation protocol with the
+condensation methods, so their rows are directly comparable:
+
+`random`, `herding`, `kcenter`, `kmeans`, `forgetting`, `uncertainty`, `el2n`, `grand`.
+
+Each is documented -- what it optimises, its hyperparameters, and where it breaks down at
+condensation-sized budgets -- in [docs/coreset.md](docs/coreset.md).
+
+## Repository layout
+
+```
+train.py                 build a condensed set or select a coreset, from a config
+evaluate.py              score a set that already exists
+ddm/
+    config.py            YAML loading, inheritance, --set overrides, validation
+    data.py              datasets
+    models.py            architecture factory
+    networks.py          the architectures
+    augment.py           DSA
+    losses/
+        style.py         L_MM, L_CM        -- Style Matching module
+        diversity.py     L_ICD             -- Intra-Class Diversity module
+    engine/
+        condense.py      the distribution-matching loop
+        select.py        the coreset selection loop
+        evaluator.py     the shared evaluation protocol
+    coreset/             one module per selector, plus the shared proxy network
+configs/                 every run is one of these
+docs/                    method, coreset methods, config schema, datasets, results
+scripts/                 dataset preparation, results collection, smoke test
+```
+
+## Documentation
+
+| | |
+| --- | --- |
+| [docs/method.md](docs/method.md) | the method, term by term |
+| [docs/coreset.md](docs/coreset.md) | the eight coreset baselines |
+| [docs/configs.md](docs/configs.md) | every config key |
+| [docs/datasets.md](docs/datasets.md) | dataset setup |
+| [docs/results.md](docs/results.md) | measured numbers and the protocol behind them |
+| [docs/extending.md](docs/extending.md) | adding a loss, a selector, a dataset, an architecture |
+
+## Note on the Intra-Class Diversity implementation
 
 This release implements the ICD module in a bounded, target-matched form: the intra-class
 spread of the condensed class is matched to the same statistic measured on the real batch,
-rather than obtained by maximising the KL divergence to the nearest intra-class neighbours
-as written in Eq. 8-9. We found the matched form considerably more stable -- it has an
+rather than obtained by maximising the KL divergence to the nearest intra-class neighbours as
+written in Eq. 8-9. We found the matched form considerably more stable -- it has an
 attainable optimum, so its weight does not have to be tuned per dataset or budget -- and it
-is the default in both `DM_DDM.py` and `DM_KNearest.py`. The module's role in the pipeline
-is unchanged. Pass `--icd_form kl` to either script to recover the Eq. 8-9 formulation.
+is the default. The module's role in the pipeline is unchanged. Set `loss.icd.form: kl` to
+recover the Eq. 8-9 formulation; `configs/paper/` does this. See
+[docs/method.md](docs/method.md) and [docs/results.md](docs/results.md).
 
-## Distilled Datasets 
-We provide various Distilled datasets (saved as tensors) with different numbers of images per class. You can access them [here](https://drive.google.com/drive/folders/1zq8YNzUoTd2N0kuGTZLwDjFuSCOo8Fih?usp=drive_link).
+## Distilled datasets
+
+Distilled datasets (saved as tensors) for various numbers of images per class are available
+[here](https://drive.google.com/drive/folders/1zq8YNzUoTd2N0kuGTZLwDjFuSCOo8Fih?usp=drive_link).
+
+## Branches
+
+`main` is the organised release described above. `dev` keeps the previous flat layout
+(`DM_DDM.py`, `DM_KNearest.py`, `utils_DM.py`, ...) for reference; the mapping from those
+scripts to configs is in [docs/configs.md](docs/configs.md) and in the `configs/ablation/`
+headers.
 
 ## Citation
-This repository is built upon [this repo](https://github.com/VICO-UoE/DatasetCondensation). If you use the code or methods from this repository, please cite their work as well.
 
-<!--The repository is based on , please cite their paper [Dataset Condensation with Distribution Matching](https://arxiv.org/pdf/2110.04181) if you use the code.-->
-
-
-
-
-
-
-
-
+This repository is built upon [this repo](https://github.com/VICO-UoE/DatasetCondensation).
+If you use the code or methods from this repository, please cite their work as well.
