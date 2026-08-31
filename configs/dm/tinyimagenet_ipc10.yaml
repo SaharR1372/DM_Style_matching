@@ -1,0 +1,21 @@
+# Plain distribution matching -- the baseline row of every table.
+# TinyImageNet, 10 images/class.  This is the protocol the reported number was measured with:
+# 3000 iterations, 2 independent condensation run(s), 5 networks evaluated per run.
+
+inherit: _base.yaml
+name: dm_tinyimagenet_ipc10
+
+data:
+  dataset: TinyImageNet
+  ipc: 10
+
+condense:
+  iterations: 3000
+  num_exp: 2
+
+eval:
+  models: [ConvNet]
+  num_eval: 5
+
+output:
+  save_path: runs/dm_tinyimagenet_ipc10

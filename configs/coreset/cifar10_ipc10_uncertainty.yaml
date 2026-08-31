@@ -1,0 +1,16 @@
+# Keep the examples the proxy is least sure about.  coreset.uncertainty.metric
+# chooses between least_confidence, entropy and margin.
+# CIFAR10, 10 images/class.
+
+inherit: _base.yaml
+name: uncertainty_cifar10_ipc10
+
+data:
+  dataset: CIFAR10
+  ipc: 10
+
+coreset:
+  selector: uncertainty
+
+output:
+  save_path: runs/uncertainty_cifar10_ipc10

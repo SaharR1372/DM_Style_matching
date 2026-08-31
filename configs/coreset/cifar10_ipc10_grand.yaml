@@ -1,0 +1,19 @@
+# Keep the examples with the largest gradient norm (Paul et al., 2021), computed
+# with the last-layer approximation ||p - y||_2 * ||h||_2.
+# CIFAR10, 10 images/class.
+
+inherit: _base.yaml
+name: grand_cifar10_ipc10
+
+data:
+  dataset: CIFAR10
+  ipc: 10
+
+coreset:
+  selector: grand
+  proxy:
+    num_models: 3
+    epochs: 20
+
+output:
+  save_path: runs/grand_cifar10_ipc10

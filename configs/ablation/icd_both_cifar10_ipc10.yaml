@@ -1,0 +1,28 @@
+# Both components of L_ICD at once.  Measured slightly below either alone --
+# they compete for the same headroom rather than adding.  See docs/results.md.
+# CIFAR10, 10 images/class, on top of the released Style Matching settings.
+
+inherit: ../ours/_base.yaml
+name: icd_both_cifar10_ipc10
+
+data:
+  dataset: CIFAR10
+  ipc: 10
+
+condense:
+  iterations: 20000
+  num_exp: 3
+
+loss:
+  mm_ratio: 180.0
+  cm_ratio: 10000.0
+  icd:
+    content_ratio: 30.0
+    style_ratio: 150.0
+
+eval:
+  models: [ConvNet]
+  num_eval: 10
+
+output:
+  save_path: runs/icd_both_cifar10_ipc10

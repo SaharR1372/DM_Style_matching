@@ -1,0 +1,16 @@
+# Uniform random sample per class. Needs no proxy network, so it costs
+# nothing to run -- and it is a stronger baseline at small budgets than it looks.
+# CIFAR10, 10 images/class.
+
+inherit: _base.yaml
+name: random_cifar10_ipc10
+
+data:
+  dataset: CIFAR10
+  ipc: 10
+
+coreset:
+  selector: random
+
+output:
+  save_path: runs/random_cifar10_ipc10

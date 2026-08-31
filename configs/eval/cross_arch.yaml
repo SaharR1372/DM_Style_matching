@@ -1,0 +1,28 @@
+# Cross-architecture evaluation of a set that has already been built.
+#
+#   python evaluate.py --config configs/eval/cross_arch.yaml \
+#       --checkpoint runs/ours_cifar10_ipc10/condensed_CIFAR10_ConvNet_style_10ipc.pt
+#
+# Only the protocol is stated here; the dataset and the architecture the set was built with
+# come from the checkpoint, so the same file works for any run.  This measures how well a
+# condensed set transfers to architectures it was never optimised against, which is the
+# usual test of whether a method has overfitted to the ConvNet it was condensed on.
+
+inherit: ../base.yaml
+method: ddm
+name: cross_arch
+
+eval:
+  models: [ConvNet, AlexNet, VGG11, ResNet18]
+  num_eval: 5
+  epochs: 1000
+  lr_net: 0.01
+  batch_train: 256
+  dsa_strategy: color_crop_cutout_flip_scale_rotate
+
+output:
+  save_path: runs/cross_arch
+
+# Unused by evaluate.py, present only so the shared validator passes.
+condense: {iterations: 0, lr_img: 1.0, batch_real: 256, num_exp: 1, seed: 0}
+loss: {}

@@ -1,0 +1,20 @@
+# Re-evaluate a saved set on one architecture, with more networks than the training run
+# used.  Useful for tightening an error bar without re-condensing:
+#
+#   python evaluate.py --config configs/eval/single.yaml \
+#       --checkpoint runs/ours_cifar10_ipc10/condensed_CIFAR10_ConvNet_style_10ipc.pt \
+#       --set eval.num_eval=20
+
+inherit: ../base.yaml
+method: ddm
+name: single_arch
+
+eval:
+  models: [ConvNet]
+  num_eval: 10
+
+output:
+  save_path: runs/eval_single
+
+condense: {iterations: 0, lr_img: 1.0, batch_real: 256, num_exp: 1, seed: 0}
+loss: {}

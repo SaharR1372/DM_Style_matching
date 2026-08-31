@@ -1,0 +1,52 @@
+# Coreset selection -- keep a subset of the real images instead of synthesising new ones.
+#
+# Every selector shares this file: the same budget (data.ipc images per class), the same
+# proxy network for the methods that need one, and the same evaluation protocol as the
+# condensation methods, so a coreset row and a DM row in one table are comparable.
+#
+# The eight selectors and what each one optimises are documented in docs/coreset.md.
+
+inherit: ../base.yaml
+method: coreset
+
+model:
+  arch: ConvNet             # also the default proxy architecture
+
+coreset:
+  selector: random          # random | herding | kcenter | kmeans | forgetting |
+                            # uncertainty | el2n | grand
+  num_exp: 3                # independent selections; only `random` and `kmeans` vary with
+                            # the seed, the rest are deterministic given the proxy
+  seed: 0
+
+  # The proxy network the score-based methods read.  Not trained at all for `random`.
+  proxy:
+    arch: null              # null = use model.arch
+    epochs: 20
+    batch_size: 256
+    lr: 0.01
+    momentum: 0.9
+    weight_decay: 0.0005
+    num_models: 1           # averaging over several proxies stabilises el2n and grand
+    workers: 4
+    dsa_strategy: color_crop_cutout_flip_scale_rotate
+
+  # Per-selector options; each is read only by its own method.
+  forgetting:
+    order: descending       # descending = keep the most forgotten (the original method)
+  uncertainty:
+    metric: entropy         # least_confidence | entropy | margin
+    order: descending
+  el2n:
+    order: descending
+  grand:
+    order: descending
+  kmeans:
+    iterations: 50
+
+eval:
+  models: [ConvNet]
+  num_eval: 5
+
+output:
+  save_path: runs/coreset

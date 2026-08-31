@@ -1,0 +1,21 @@
+# The objective exactly as specified in the WACV 2025 paper, for reproduction.
+#
+#     L = L_MMD  +  1e4 * L_MM  +  10 * L_ICD(kl)
+#
+# Style is read after normalisation with the batch-averaged moments estimator, and the ICD
+# module uses the unbounded Eq. 8-9 KL repulsion.  This configuration is kept so the
+# published numbers can be reproduced; configs/ours is the configuration to build on.
+# docs/method.md records how the two compare when measured side by side.
+
+inherit: ../dm/_base.yaml
+
+loss:
+  style_tap: norm
+  style_mode: batchavg
+  relative_style: false
+  mm_ratio: 10000.0
+  cm_ratio: 0.0
+  icd:
+    form: kl
+    content_ratio: 10.0
+    k: -1                   # 0.2 * ipc nearest intra-class neighbours

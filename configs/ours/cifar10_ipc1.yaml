@@ -1,0 +1,21 @@
+# The released method: Style Matching + the bounded Intra-Class Diversity term.
+# CIFAR10, 1 images/class.  This is the protocol the reported number was measured with:
+# 20000 iterations, 3 independent condensation run(s), 10 networks evaluated per run.
+
+inherit: _base.yaml
+name: ours_cifar10_ipc1
+
+data:
+  dataset: CIFAR10
+  ipc: 1
+
+condense:
+  iterations: 20000
+  num_exp: 3
+
+eval:
+  models: [ConvNet]
+  num_eval: 10
+
+output:
+  save_path: runs/ours_cifar10_ipc1

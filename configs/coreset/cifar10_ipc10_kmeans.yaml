@@ -1,0 +1,16 @@
+# One example per k-means centroid of the class: covers the modes of the class
+# with density weighting, between herding and k-center.
+# CIFAR10, 10 images/class.
+
+inherit: _base.yaml
+name: kmeans_cifar10_ipc10
+
+data:
+  dataset: CIFAR10
+  ipc: 10
+
+coreset:
+  selector: kmeans
+
+output:
+  save_path: runs/kmeans_cifar10_ipc10

@@ -1,0 +1,16 @@
+# Greedily match the class mean in feature space (Welling, 2009).  The coreset
+# counterpart of distribution matching: same objective, but restricted to real images.
+# CIFAR100, 10 images/class.
+
+inherit: _base.yaml
+name: herding_cifar100_ipc10
+
+data:
+  dataset: CIFAR100
+  ipc: 10
+
+coreset:
+  selector: herding
+
+output:
+  save_path: runs/herding_cifar100_ipc10

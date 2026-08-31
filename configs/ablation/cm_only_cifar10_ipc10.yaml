@@ -1,0 +1,27 @@
+# Correlation (Gram) Matching alone: L_MMD + L_CM.  The per-module script this
+# replaces was DM_GramMatching.py.
+# CIFAR10, 10 images/class, on top of the released Style Matching settings.
+
+inherit: ../ours/_base.yaml
+name: cm_only_cifar10_ipc10
+
+data:
+  dataset: CIFAR10
+  ipc: 10
+
+condense:
+  iterations: 20000
+  num_exp: 3
+
+loss:
+  mm_ratio: 0.0
+  cm_ratio: 10000.0
+  icd:
+    content_ratio: 0.0
+
+eval:
+  models: [ConvNet]
+  num_eval: 10
+
+output:
+  save_path: runs/cm_only_cifar10_ipc10

@@ -1,0 +1,23 @@
+# The released method: Decomposed Distribution Matching.
+#
+#     L = L_MMD  +  180 * L_MM  +  1e4 * L_CM  +  30 * L_CD
+#
+# Style Matching (L_MM + L_CM) is read from the pre-normalisation convolution output with
+# the per-sample moments estimator, and the Intra-Class Diversity module uses the bounded,
+# target-matched form of L_ICD.  All three coefficients are scale-free -- each term is
+# normalised by the magnitude of its own real target -- so they transfer across datasets,
+# resolutions and budgets without retuning.  See docs/method.md.
+
+inherit: ../dm/_base.yaml
+
+loss:
+  style_tap: conv           # read the style before normalisation, where it still exists
+  style_mode: persample     # unbiased with respect to batch size, unlike batchavg
+  relative_style: true      # makes the coefficients scale-free
+  mm_ratio: 180.0
+  cm_ratio: 10000.0
+  icd:
+    form: bounded
+    content_ratio: 30.0
+    style_ratio: 0.0        # the style component is an alternative to the content one,
+                            # not an addition; it costs accuracy above 32x32

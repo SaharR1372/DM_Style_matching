@@ -1,0 +1,17 @@
+# Keep the examples the proxy most often forgets during training (Toneva et al.,
+# 2019).  Set coreset.forgetting.order: ascending to keep the easiest instead --
+# at ipc = 10 the hardest examples are mostly boundary and noisy ones.
+# CIFAR10, 10 images/class.
+
+inherit: _base.yaml
+name: forgetting_cifar10_ipc10
+
+data:
+  dataset: CIFAR10
+  ipc: 10
+
+coreset:
+  selector: forgetting
+
+output:
+  save_path: runs/forgetting_cifar10_ipc10

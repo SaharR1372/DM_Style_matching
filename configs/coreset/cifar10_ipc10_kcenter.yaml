@@ -1,0 +1,16 @@
+# Greedy minimax cover of the class (Sener & Savarese, 2018).  Matches the support
+# rather than the mean, and is therefore sensitive to outliers.
+# CIFAR10, 10 images/class.
+
+inherit: _base.yaml
+name: kcenter_cifar10_ipc10
+
+data:
+  dataset: CIFAR10
+  ipc: 10
+
+coreset:
+  selector: kcenter
+
+output:
+  save_path: runs/kcenter_cifar10_ipc10

@@ -1,0 +1,13 @@
+# The published objective reproduced bit-for-bit, including the style accumulator that the
+# released scripts never reset between classes -- an early class's style loss is re-added,
+# geometrically damped, for every later class.  Kept only to quantify that effect; use
+# configs/paper/cifar10_ipc10.yaml for the intended objective.
+
+inherit: _base.yaml
+name: legacy_cifar10_ipc10
+
+data: {dataset: CIFAR10, ipc: 10}
+condense: {iterations: 20000, num_exp: 3}
+loss: {legacy_style_accum: true}
+eval: {models: [ConvNet], num_eval: 10}
+output: {save_path: runs/legacy_cifar10_ipc10}

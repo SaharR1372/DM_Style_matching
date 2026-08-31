@@ -1,0 +1,19 @@
+# Keep the examples with the largest error vector, ||softmax(f(x)) - onehot(y)||_2
+# (Paul et al., 2021).  Raise coreset.proxy.num_models to average over proxies.
+# CIFAR100, 10 images/class.
+
+inherit: _base.yaml
+name: el2n_cifar100_ipc10
+
+data:
+  dataset: CIFAR100
+  ipc: 10
+
+coreset:
+  selector: el2n
+  proxy:
+    num_models: 3
+    epochs: 20
+
+output:
+  save_path: runs/el2n_cifar100_ipc10

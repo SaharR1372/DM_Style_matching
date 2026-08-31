@@ -1,0 +1,29 @@
+# Defaults shared by every method.  Not runnable on its own -- it declares no `method` --
+# but every config in this directory inherits from it, directly or through a method base,
+# so anything set here is the value a config gets when it stays silent.
+#
+# The full schema is documented in docs/configs.md.
+
+data:
+  dataset: CIFAR10          # MNIST | FashionMNIST | SVHN | CIFAR10 | CIFAR100 | TinyImageNet | ImageNet
+  data_path: data           # torchvision downloads here; see docs/datasets.md
+  ipc: 10                   # images per class -- the budget, shared by both methods
+
+model:
+  arch: ConvNet             # architecture the small set is built with
+  net_depth: 0              # ConvNet depth; 0 = auto (4 at 64x64 and above, else 3)
+
+# The evaluation protocol.  Every method is scored the same way: train `num_eval` freshly
+# initialised networks from scratch on the small set and test each on the real test set.
+eval:
+  models: [ConvNet]         # architectures to evaluate on; more than one = cross-architecture
+  num_eval: 5               # networks trained per architecture, per repetition
+  epochs: 1000              # training epochs per evaluation network
+  lr_net: 0.01
+  batch_train: 256
+  dsa_strategy: color_crop_cutout_flip_scale_rotate
+  every: 0                  # ddm only: also evaluate every N iterations; 0 = only at the end
+
+output:
+  save_path: runs/base
+  save_images: true         # write a PNG grid of the small set
