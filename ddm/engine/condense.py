@@ -14,8 +14,7 @@ difference rather than a separate script:
 
          Both components match an intra-class spread against the same statistic measured on
          the real batch, so each is bounded, is minimised where the condensed class has the
-         spread of the real class, and needs no repulsion strength to be tuned.  Setting
-         ``loss.icd.form: kl`` selects the published Eq. 8-9 formulation instead.
+         spread of the real class, and needs no repulsion strength to be tuned.
 
 Setting a weight to zero removes its term: ``configs/dm`` leaves all of them at zero and so
 reproduces plain distribution matching.  See docs/method.md.
@@ -30,8 +29,7 @@ import torch
 from ddm.augment import DiffAugment, ParamDiffAug
 from ddm.data import get_dataset
 from ddm.engine.evaluator import evaluate_set, summarise
-from ddm.losses import (correlation_matching_loss, icd_k_for_ipc,
-                        intra_class_diversity_loss, intra_class_diversity_loss_kl,
+from ddm.losses import (correlation_matching_loss, intra_class_diversity_loss,
                         moments_matching_loss)
 from ddm.models import get_network
 from ddm.utils import append_result, format_time, get_time, save_image_grid, set_seed
@@ -66,13 +64,9 @@ def condense(cfg):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     cond, loss_cfg, ev = cfg.condense, cfg.loss, cfg.eval
     icd_cfg = loss_cfg.get('icd', {})
-    icd_form = icd_cfg.get('form', 'bounded')
     icd_content = float(icd_cfg.get('content_ratio', 0.0))
     icd_style = float(icd_cfg.get('style_ratio', 0.0))
     icd_rank = int(icd_cfg.get('rank', 0))
-    icd_k = int(icd_cfg.get('k', -1))
-    if icd_k < 0:
-        icd_k = icd_k_for_ipc(int(cfg.data.ipc))
     needs_style = _needs_style(loss_cfg)
 
     dsa_strategy = cond.get('dsa_strategy') or None
@@ -153,7 +147,6 @@ def condense(cfg):
 
             loss = torch.zeros((), device=device)
             parts = {'mmd': 0.0, 'mm': 0.0, 'cm': 0.0, 'icd': 0.0, 'sd': 0.0, 'cd': 0.0}
-            style_accum = torch.zeros((), device=device)  # only used by legacy_style_accum
 
             chunk = int(cond.get('class_chunk', 10)) or num_classes
             for c0 in range(0, num_classes, chunk):
@@ -204,25 +197,9 @@ def condense(cfg):
                                 l = correlation_matching_loss(f_s[s], f_r[r])
                                 style_c = style_c + float(loss_cfg.cm_ratio) * l
                                 parts['cm'] += float(l.detach())
-                        style_c = style_c / max(len(feats_syn), 1)
-                        if loss_cfg.get('legacy_style_accum', False):
-                            # The published scripts never reset the accumulator between
-                            # classes and divide it by the layer count each time, so an
-                            # early class's style loss is re-added, geometrically damped,
-                            # for every later class.  Kept only to quantify the effect.
-                            style_accum = ((style_accum + style_c * len(feats_syn))
-                                           / max(len(feats_syn), 1))
-                            loss = loss + style_accum
-                        else:
-                            loss = loss + style_c
+                        loss = loss + style_c / max(len(feats_syn), 1)
 
-                    if icd_form == 'kl':
-                        # Published Eq. 8-9, retained for reproduction only.
-                        if icd_content and icd_k >= 1:
-                            l_icd = intra_class_diversity_loss_kl(out_syn[s], k=icd_k)
-                            loss = loss + icd_content * l_icd
-                            parts['icd'] += float(l_icd.detach())
-                    elif icd_content or icd_style:
+                    if icd_content or icd_style:
                         use_style = icd_style and feats_syn
                         l_icd, icd_parts = intra_class_diversity_loss(
                             out_syn[s], out_real[r],

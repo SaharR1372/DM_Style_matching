@@ -2,7 +2,7 @@
 #
 # Content matching only: every style and diversity weight is zero, so the objective reduces
 # to L_MMD, the squared distance between the class-mean embeddings of the real and the
-# condensed batch.  The method configs under configs/ours and configs/paper inherit this
+# condensed batch.  The method configs under configs/ours and configs/ablation inherit this
 # file and switch terms on, which is what makes an ablation a diff between two configs.
 
 inherit: ../base.yaml
@@ -27,12 +27,9 @@ loss:
   style_tap: norm           # where the style is read: norm | conv | act | pool
   style_mode: batchavg      # batchavg | persample -- the moments estimator
   relative_style: false     # normalise style terms by the magnitude of the real target
-  legacy_style_accum: false # reproduce the released scripts' un-reset style accumulator
   mm_ratio: 0.0             # L_MM, style moments matching
   cm_ratio: 0.0             # L_CM, style correlation (Gram) matching
   icd:                      # L_ICD, intra-class diversity
-    form: bounded           # bounded (released) | kl (the published Eq. 8-9 formulation)
     content_ratio: 0.0      # weight of the content component, L_CD
     style_ratio: 0.0        # weight of the style component, L_SD
     rank: 0                 # principal directions matched by L_CD; 0 = min(ipc-1, 16)
-    k: -1                   # kl form only: neighbours; -1 = 0.2 * ipc, as in the paper

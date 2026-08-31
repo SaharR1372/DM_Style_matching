@@ -93,24 +93,19 @@ to TinyImageNet.
 ## Intra-Class Diversity (ICD)
 
 `ddm/losses/diversity.py`. The module that keeps the `ipc` images of a class from collapsing
-onto one prototype. Two formulations ship, selected by `loss.icd.form`.
+onto one prototype.
 
-### `form: kl` — the published Eq. 8-9
+### Bounded and target-matched
 
-For each synthetic sample, take the mean embedding *m* of its *k* nearest intra-class
-neighbours (`k = 0.2 · ipc`) and **maximise** `KL( S(φ(x̃)) ‖ S(m) )`.
+The paper describes this module as maximising a divergence between each synthetic sample and
+its nearest intra-class neighbours. Maximising an unbounded quantity gives a term no
+attainable optimum: there is no weight at which it both spreads the samples and then stops.
+Its descent direction never terminates, so past a moderate weight it overwhelms the content
+matching and disperses the class far past anything present in the real data, and its
+coefficient has to be retuned per dataset and per budget.
 
-This is what the paper specifies, and it is kept so the published objective can be
-reproduced. It has a structural problem: maximising an unbounded divergence gives the term
-no attainable optimum. There is no weight at which it both spreads the samples and then
-stops -- its descent direction never terminates, and past a moderate weight it simply
-overwhelms the content matching and disperses the class far past anything present in the
-real data. Its weight consequently has to be retuned per dataset and per budget.
-
-### `form: bounded` — the released implementation
-
-Same role, built the opposite way. Each component compares a synthetic statistic against the
-**same statistic measured on the real batch**:
+The released implementation is built the opposite way. Each component compares a synthetic
+statistic against the **same statistic measured on the real batch**:
 
 ```
 L_ICD = content_ratio · L_CD  +  style_ratio · L_SD
@@ -154,7 +149,6 @@ loss:
   mm_ratio: 180.0
   cm_ratio: 10000.0
   icd:
-    form: bounded
     content_ratio: 30.0
     style_ratio: 0.0
 ```
@@ -166,30 +160,20 @@ used unchanged on CIFAR100 and TinyImageNet.
 
 This release implements the ICD module in a **bounded, target-matched** form: the
 intra-class spread of the condensed class is matched to the same statistic measured on the
-real batch, rather than obtained by maximising the KL divergence to the nearest intra-class
-neighbours as written in Eq. 8-9 of the paper.
+real batch, rather than obtained by maximising a divergence to the nearest intra-class
+neighbours.
 
 The matched form is considerably more stable. It has an attainable optimum, so its weight
-does not have to be tuned per dataset or budget, and it is therefore the default in every
-shipped config. **The module's role in the pipeline is unchanged** -- it is still the
-component that keeps the `ipc` images of a class from collapsing onto one prototype; only
-the way that pressure is expressed differs.
-
-Set `loss.icd.form: kl` to recover the Eq. 8-9 formulation exactly. `configs/paper/` does
-this, so the published objective remains one command away:
-
-```bash
-python train.py --config configs/paper/cifar10_ipc10.yaml
-```
-
-The measured comparison between the two formulations is in [results.md](results.md).
+does not have to be tuned per dataset or budget, and one value transfers across CIFAR10,
+CIFAR100 and TinyImageNet unchanged. **The module's role in the pipeline is unchanged** --
+it is still the component that keeps the `ipc` images of a class from collapsing onto one
+prototype; only the way that pressure is expressed differs.
 
 ## A note on scope
 
-`configs/paper` reproduces the objective as published; `configs/ours` is the configuration
-to build on. Where the two differ, [results.md](results.md) records the measured difference
-rather than asserting one. In particular, the intra-class diversity module is neutral within
-error bars on top of Style Matching at every resolution tested -- the measured gain in this
+[results.md](results.md) records what each term is measured to be worth rather than
+asserting it. In particular, the intra-class diversity module is neutral within error bars
+on top of Style Matching at every resolution tested -- the measured gain in this
 implementation comes from the Style Matching module. That is stated here because a reader
 reproducing the ablation will find it, and should find it documented rather than surprising.
 

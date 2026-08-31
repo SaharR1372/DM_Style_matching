@@ -132,9 +132,6 @@ def validate(cfg):
     if cfg.method == 'ddm':
         if 'condense' not in cfg or 'loss' not in cfg:
             raise ValueError("method 'ddm' needs both a 'condense' and a 'loss' section")
-        form = cfg.loss.get('icd', {}).get('form', 'bounded')
-        if form not in ('bounded', 'kl'):
-            raise ValueError(f"loss.icd.form must be 'bounded' or 'kl', got {form!r}")
         tap = cfg.loss.get('style_tap', 'norm')
         if tap not in ('norm', 'conv', 'act', 'pool'):
             raise ValueError(f"loss.style_tap must be one of norm/conv/act/pool, got {tap!r}")

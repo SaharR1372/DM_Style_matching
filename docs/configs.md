@@ -90,14 +90,11 @@ Label recorded in `results.json`. Defaults to the method name.
 | `style_tap` | `norm` | where the style is read: `conv` \| `norm` \| `act` \| `pool` |
 | `style_mode` | `batchavg` | moments estimator: `batchavg` (published) \| `persample` (released) |
 | `relative_style` | false | normalise style terms by the magnitude of the real target |
-| `legacy_style_accum` | false | reproduce the released scripts' un-reset style accumulator |
 | `mm_ratio` | 0.0 | weight of L_MM |
 | `cm_ratio` | 0.0 | weight of L_CM |
-| `icd.form` | `bounded` | `bounded` (released) \| `kl` (published Eq. 8-9) |
 | `icd.content_ratio` | 0.0 | weight of L_CD, the content component |
 | `icd.style_ratio` | 0.0 | weight of L_SD, the style component |
 | `icd.rank` | 0 | principal directions matched by L_CD; 0 = `min(ipc-1, 16)` |
-| `icd.k` | −1 | `kl` form only: neighbours; −1 = `0.2 · ipc` |
 
 A weight of zero removes its term entirely, including the cost of computing it. See
 [method.md](method.md).
@@ -173,13 +170,11 @@ The `dev` branch keeps the earlier flat scripts. Each is now a config:
 | --- | --- |
 | `DM_DDM.py --preset dm` | `configs/dm/cifar10_ipc10.yaml` |
 | `DM_DDM.py --preset ours` | `configs/ours/cifar10_ipc10.yaml` |
-| `DM_DDM.py --preset paper` | `configs/paper/cifar10_ipc10.yaml` |
-| `DM_DDM.py --preset legacy` | `configs/paper/legacy_cifar10_ipc10.yaml` |
 | `DM_MeanStd_Matching.py` | `configs/ablation/mm_only_cifar10_ipc10.yaml` |
 | `DM_GramMatching.py` | `configs/ablation/cm_only_cifar10_ipc10.yaml` |
 | `DM_KNearest.py` | `configs/ablation/icd_only_cifar10_ipc10.yaml` |
 
 Command-line flags map onto config keys directly: `--ipc` → `data.ipc`, `--Iteration` →
 `condense.iterations`, `--mm_ratio` → `loss.mm_ratio`, `--icd_ratio` →
-`loss.icd.content_ratio`, `--icd_style_ratio` → `loss.icd.style_ratio`, `--icd_form` →
-`loss.icd.form`, `--save_path` → `output.save_path`.
+`loss.icd.content_ratio`, `--icd_style_ratio` → `loss.icd.style_ratio`, `--save_path` →
+`output.save_path`.

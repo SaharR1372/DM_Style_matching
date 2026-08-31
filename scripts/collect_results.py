@@ -38,15 +38,10 @@ def describe(rec):
         terms.append('L_MM(%g)' % loss['mm_ratio'])
     if loss.get('cm_ratio'):
         terms.append('L_CM(%g)' % loss['cm_ratio'])
-    if icd.get('form') == 'kl' and icd.get('content_ratio'):
-        terms.append('L_ICD-kl(%g)' % icd['content_ratio'])
-    else:
-        if icd.get('content_ratio'):
-            terms.append('L_CD(%g)' % icd['content_ratio'])
-        if icd.get('style_ratio'):
-            terms.append('L_SD(%g)' % icd['style_ratio'])
-    if loss.get('legacy_style_accum'):
-        terms.append('legacy-accum')
+    if icd.get('content_ratio'):
+        terms.append('L_CD(%g)' % icd['content_ratio'])
+    if icd.get('style_ratio'):
+        terms.append('L_SD(%g)' % icd['style_ratio'])
     return ' + '.join(terms)
 
 

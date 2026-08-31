@@ -16,8 +16,6 @@ config declares, so a row can be reproduced with one command.
 | config | objective | accuracy (%) |
 | --- | --- | --- |
 | `configs/dm/cifar10_ipc10.yaml` | L_MMD only (baseline) | 48.79 ± 0.87 |
-| `configs/paper/cifar10_ipc10.yaml` | L_MMD + L_MM + L_ICD(kl) | 45.13 ± 0.98 |
-| `configs/paper/legacy_cifar10_ipc10.yaml` | as above, un-reset accumulator | 45.26 ± 0.98 |
 | `configs/ablation/sm_only_cifar10_ipc10.yaml` | L_MMD + L_MM + L_CM | **51.13 ± 0.66** |
 | `configs/ablation/icd_style_cifar10_ipc10.yaml` | + L_SD | 51.13 ± 0.50 |
 | `configs/ours/cifar10_ipc10.yaml` | + L_CD *(released)* | 51.05 ± 0.43 |
@@ -30,7 +28,6 @@ config declares, so a row can be reproduced with one command.
 | config | objective | accuracy (%) |
 | --- | --- | --- |
 | `configs/dm/cifar100_ipc10.yaml` | L_MMD only | 29.32 ± 0.29 |
-| `configs/paper/cifar100_ipc10.yaml` | L_MMD + L_MM + L_ICD(kl) | 26.23 ± 0.36 |
 | `configs/ablation/sm_only_cifar100_ipc10.yaml` | L_MMD + L_MM + L_CM | **30.57 ± 0.37** |
 | `configs/ours/cifar100_ipc10.yaml` | + L_CD *(released)* | 30.44 ± 0.17 |
 | `configs/ablation/icd_style_cifar100_ipc10.yaml` | + L_SD | 30.33 ± 0.38 |
@@ -51,10 +48,10 @@ ConvNetD4, resolved automatically from the 64×64 resolution.
 
 20 000 iterations, 30 networks per row.
 
-| ipc | `configs/dm` | `configs/paper` |
-| --- | --- | --- |
-| 1 | 26.14 ± 0.87 | 25.67 ± 0.97 |
-| 50 | 62.87 ± 0.37 | 43.48 ± 0.48 |
+| ipc | `configs/dm` |
+| --- | --- |
+| 1 | 26.14 ± 0.87 |
+| 50 | 62.87 ± 0.37 |
 
 `configs/ours` has not been measured at ipc = 1 or ipc = 50; the shipped configs for those
 budgets are the released settings applied unchanged, not a measured result.
@@ -82,17 +79,6 @@ bounded versus unbounded formulations in [method.md](method.md).
 **3. The gain shrinks as the data gets harder.** +2.34 → +1.25 → +0.68 across CIFAR10,
 CIFAR100 and TinyImageNet. Second-order feature statistics buy less where the gap to real
 data is largest, which is worth knowing before extending the method to harder datasets.
-
-**4. On reproducing the published objective.** `configs/paper` implements Eq. 8-9 as
-written, and in this implementation it measures below the plain DM baseline at every budget
-tested, with the deficit widening at ipc = 50. The cause is structural rather than a bug:
-the published L_ICD **maximises** an unbounded KL divergence, so it has no attainable
-optimum and no weight at which it both spreads the samples and stops. Its coefficient has to
-be retuned for each dataset and budget, and a value calibrated at ipc = 10 is far too strong
-at ipc = 50. The released implementation replaces it with the bounded, target-matched form
-(`loss.icd.form: bounded`), whose optimum is read off the real data and whose weight
-therefore transfers unchanged. `form: kl` is kept so the published objective can still be
-run.
 
 ---
 
@@ -132,7 +118,7 @@ Why the difficulty-ranked methods land near chance, and what to try instead, is 
 ```bash
 python train.py --config configs/ours/cifar10_ipc10.yaml       # the released method
 python train.py --config configs/dm/cifar10_ipc10.yaml         # the baseline
-python train.py --config configs/paper/cifar10_ipc10.yaml      # the published objective
+python train.py --config configs/ablation/sm_only_cifar10_ipc10.yaml   # Style Matching alone
 ```
 
 Each writes its summary to `<save_path>/results.json`. Point several runs at one

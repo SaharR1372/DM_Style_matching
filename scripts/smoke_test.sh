@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# End-to-end smoke test: every entry point, every coreset selector, both ICD formulations.
+# End-to-end smoke test: every entry point, every coreset selector, every loss term.
 #
 #     bash scripts/smoke_test.sh [output_dir]
 #
@@ -30,16 +30,22 @@ sys.exit(1 if bad else 0)
 PY
 
 echo
-echo "=== condensation: released method (bounded ICD) ==="
+echo "=== condensation: released method ==="
 python train.py -c configs/ours/cifar10_ipc10.yaml \
     --set $CFG_SMALL condense.iterations=6 condense.num_exp=1 eval.every=3 \
           output.save_path="$OUT/ours"
 
 echo
-echo "=== condensation: published objective (kl ICD, legacy accumulator) ==="
-python train.py -c configs/paper/legacy_cifar10_ipc10.yaml \
+echo "=== condensation: Style Matching alone, no diversity term ==="
+python train.py -c configs/ablation/sm_only_cifar10_ipc10.yaml \
     --set $CFG_SMALL condense.iterations=4 condense.num_exp=1 \
-          output.save_path="$OUT/paper"
+          output.save_path="$OUT/sm_only"
+
+echo
+echo "=== condensation: the style component of L_ICD ==="
+python train.py -c configs/ablation/icd_style_cifar10_ipc10.yaml \
+    --set $CFG_SMALL condense.iterations=4 condense.num_exp=1 \
+          output.save_path="$OUT/icd_style"
 
 echo
 echo "=== condensation: plain distribution matching ==="

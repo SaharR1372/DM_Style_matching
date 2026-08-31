@@ -88,7 +88,6 @@ configs/
     base.yaml               defaults shared by every method
     dm/                     plain distribution matching -- the baseline
     ours/                   the released method
-    paper/                  the objective exactly as published, for reproduction
     ablation/               one term at a time: mm_only, cm_only, sm_only, icd_only, ...
     coreset/                the eight coreset selectors
     eval/                   evaluation-only protocols, including cross-architecture

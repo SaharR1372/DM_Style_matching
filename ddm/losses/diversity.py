@@ -1,68 +1,15 @@
 """Intra-Class Diversity (ICD) module -- L_ICD.
 
-Two formulations live here:
+The module that keeps the ``ipc`` synthetic images of a class from collapsing onto a single
+prototype.  ``intra_class_diversity_loss`` is the released form: bounded and target-matched,
+built from a content component (``content_diversity_loss``) and a style component
+(``style_diversity_loss``).
 
-  ``intra_class_diversity_loss``     the released form -- bounded and target-matched,
-                                     built from a content and a style component.
-  ``intra_class_diversity_loss_kl``  the Eq. 8-9 form -- unbounded KL repulsion, kept so
-                                     the published objective can still be reproduced.
-
-See ``intra_class_diversity_loss`` for why the released form is the one to use, and
-docs/method.md for the measured comparison between them.
+See ``intra_class_diversity_loss`` for the design, and docs/method.md for the measurements.
 """
 import torch
-import torch.nn.functional as F
 
 from ddm.losses.style import _sq_diff, style_vector
-
-
-def icd_k_for_ipc(ipc):
-    """k = 0.2 x IPC nearest intra-class neighbours, at least 1 and at most ipc-1."""
-    if ipc < 2:
-        return 0
-    return int(max(1, min(ipc - 1, round(0.2 * ipc))))
-
-
-def intra_class_diversity_loss_kl(feat, k=None, ipc=None, eps=1e-8):
-    """Eq. 8-9 of the paper: maximise KL divergence to the k nearest intra-class neighbours.
-
-    For every synthetic sample x~ of the class we take the mean embedding m of its k
-    nearest intra-class neighbours and *maximise* KL( S(phi(x~)) || S(m) ), which is
-    returned here with a negative sign so it can be added to a minimised objective.
-
-    SUPERSEDED by `intra_class_diversity_loss`, and retained only so the published
-    objective can be reproduced exactly.  This form maximises a divergence, so it is
-    unbounded below and has no attainable optimum: the descent direction never
-    terminates and past a moderate weight the term simply overwhelms the content
-    matching, driving the intra-class scatter far past anything present in the real
-    data.  Prefer the released bounded form for any new work.
-
-    Args:
-        feat: (n, d) embeddings of one class's synthetic samples.
-        k:    number of neighbours; if None it is derived from ``ipc`` (or n) as 0.2*IPC.
-        ipc:  images per class, used only to derive k.
-
-    Returns:
-        Scalar tensor, 0 when the class holds fewer than two samples.
-    """
-    n = feat.shape[0]
-    if k is None:
-        k = icd_k_for_ipc(ipc if ipc is not None else n)
-    k = int(min(max(k, 0), n - 1)) if n > 1 else 0
-    if k < 1:
-        return feat.sum() * 0.0
-
-    # k nearest intra-class neighbours by squared L2 in feature space (Eq. 9).
-    with torch.no_grad():
-        d2 = torch.cdist(feat, feat, p=2) ** 2
-        d2.fill_diagonal_(float('inf'))
-        nn_idx = torch.topk(d2, k, dim=1, largest=False).indices  # (n, k)
-
-    m = feat[nn_idx].mean(dim=1)                      # (n, d) neighbourhood centroid
-    log_p = F.log_softmax(feat, dim=1)
-    log_q = F.log_softmax(m, dim=1)
-    kl = (log_p.exp() * (log_p - log_q)).sum(dim=1)   # KL( S(phi(x~)) || S(m) )
-    return -kl.sum()
 
 
 def style_diversity_loss(feat_syn, feat_real, relative=False, eps=1e-5):
@@ -151,14 +98,13 @@ def intra_class_diversity_loss(emb_syn, emb_real, feat_syn=None, feat_real=None,
             per-sample style descriptors of the intermediate feature maps.  This is the
             style axis, and is off by default (see the note on redundancy below).
 
-    Why this replaces the KL-repulsion formulation
-    ----------------------------------------------
-    `intra_class_diversity_loss_kl` implements Eq. 8-9 by *maximising* a divergence
-    between each sample and its k nearest intra-class neighbours.  Maximising an
-    unbounded quantity gives the term no attainable optimum: its descent direction never
-    terminates, so there is no weight at which it both spreads the samples and stops.  In
-    practice it keeps pushing until it dominates the content matching and disperses the
-    class well beyond the spread of the real data.
+    Bounded and target-matched
+    --------------------------
+    A diversity term built by *maximising* how far apart the samples are has no attainable
+    optimum: the descent direction never terminates, so there is no weight at which it both
+    spreads the class and stops.  Past a moderate coefficient such a term dominates the
+    content matching and disperses the class well beyond the spread of the real data, and
+    its weight has to be retuned for every dataset and budget.
 
     Both components here are built the opposite way.  Each compares a synthetic statistic
     against the *same statistic measured on the real batch*, so the loss is bounded below
