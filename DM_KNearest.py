@@ -7,7 +7,7 @@ import torch
 import logging
 import torch.nn as nn
 from torchvision.utils import save_image
-from utils_DM import intra_class_diversity_loss, get_loops, get_dataset, get_network, get_eval_pool, evaluate_synset, get_daparam, match_loss, get_time, TensorDataset, epoch, DiffAugment, ParamDiffAug
+from utils_DM import intra_class_diversity_loss, intra_class_diversity_loss_kl, icd_k_for_ipc, get_loops, get_dataset, get_network, get_eval_pool, evaluate_synset, get_daparam, match_loss, get_time, TensorDataset, epoch, DiffAugment, ParamDiffAug
 import torch
 
 def format_time(seconds):
@@ -40,10 +40,20 @@ def main():
     parser.add_argument('--save_path', type=str, default='result', help='path to save results')
     parser.add_argument('--dis_metric', type=str, default='ours', help='distance metric')
     parser.add_argument('--subset', type=str, default='imagenette', help='ImageNet subset. This only does anything when --dataset=ImageNet')
-    parser.add_argument('--icd_ratio', type=float, default=1, help='contribution of intra-class diversity loss')
+    parser.add_argument('--icd_ratio', type=float, default=30, help='contribution of the intra-class diversity loss')
+    parser.add_argument('--icd_form', type=str, default='bounded', choices=['bounded', 'kl'],
+                        help="'bounded' (default) matches the intra-class spread of the real class and "
+                             "has an attainable optimum; 'kl' is the unbounded Eq. 8-9 formulation, kept "
+                             "only to reproduce the published objective")
+    parser.add_argument('--icd_rank', type=int, default=0,
+                        help='principal directions matched by the bounded form; 0 = min(ipc-1, 16)')
+    parser.add_argument('--icd_k', type=int, default=-1,
+                        help="nearest intra-class neighbours for --icd_form kl; -1 = 0.2*ipc as in the paper")
 
 
     args = parser.parse_args()
+    if args.icd_k < 0:
+        args.icd_k = icd_k_for_ipc(args.ipc)
     args.method = 'DM'
     args.outer_loop, args.inner_loop = get_loops(args.ipc)
     args.device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -188,8 +198,14 @@ def main():
                 output_syn = embed(img_syn)
 
                 loss += torch.sum((torch.mean(output_real, dim=0) - torch.mean(output_syn, dim=0))**2)
-                # Compute the intra-class diversity loss for the synthetic images
-                l_icd = intra_class_diversity_loss(output_syn, k=2)  # You can adjust the value of k
+                # Compute the intra-class diversity loss for the synthetic images.
+                # k = 0.2 * IPC as in the paper; it used to be hard-coded to 2, which only
+                # agrees with the paper at IPC=10.
+                if args.icd_form == 'kl':
+                    l_icd = intra_class_diversity_loss_kl(output_syn, k=args.icd_k)
+                else:
+                    l_icd = intra_class_diversity_loss(output_syn, output_real,
+                                                       rank=args.icd_rank)
                 # Combine the content loss and the weighted intra-class diversity loss
                 loss += (args.icd_ratio * l_icd)
 
