@@ -53,7 +53,7 @@ source of variance and reporting it is more honest than hiding it behind one fix
 
 ## The methods
 
-### `random`
+### `random` — the budget baseline
 
 Draw `ipc` examples per class uniformly without replacement.
 
@@ -66,9 +66,11 @@ small.
 
 **Config:** nothing beyond `selector: random`.
 
+**Reference:** none -- it is the trivial baseline.
+
 ---
 
-### `herding` — Welling (2009); popularised by iCaRL (Rebuffi et al., 2017)
+### `herding` — match the class mean in feature space
 
 Greedily keep the running mean of the selected set as close as possible to the true class
 mean in feature space. At step *k* the method adds
@@ -94,9 +96,17 @@ the same degeneracy that motivates the Intra-Class Diversity module on the conde
 **Config:** nothing beyond `selector: herding`. Sensitive to `coreset.proxy.epochs`, since
 the features are the proxy's.
 
+**References:**
+- Max Welling. *Herding Dynamical Weights to Learn.* ICML 2009.
+  [[pdf]](https://icml.cc/Conferences/2009/papers/447.pdf)
+- Sylvestre-Alvise Rebuffi, Alexander Kolesnikov, Georg Sperl, Christoph H. Lampert.
+  *iCaRL: Incremental Classifier and Representation Learning.* CVPR 2017.
+  [[arXiv:1611.07725]](https://arxiv.org/abs/1611.07725) -- the paper that made herding
+  the standard exemplar-selection baseline.
+
 ---
 
-### `kcenter` — Sener & Savarese (2018)
+### `kcenter` — cover the class's support
 
 Solve the minimax facility-location problem: choose *S* so that no example is far from every
 selected example.
@@ -118,9 +128,13 @@ class.
 
 **Config:** nothing beyond `selector: kcenter`.
 
+**Reference:** Ozan Sener, Silvio Savarese. *Active Learning for Convolutional Neural
+Networks: A Core-Set Approach.* ICLR 2018.
+[[arXiv:1708.00489]](https://arxiv.org/abs/1708.00489)
+
 ---
 
-### `kmeans`
+### `kmeans` — one representative per mode
 
 Run Lloyd's algorithm on the class's features with `ipc` clusters (k-means++ initialisation,
 `coreset.kmeans.iterations` steps), then keep the example nearest each centroid. Centroids
@@ -135,9 +149,17 @@ most often beats random at small budgets.
 **Config:** `coreset.kmeans.iterations` (default 50). Stochastic through k-means++, so it
 genuinely varies across repetitions.
 
+**References:**
+- Stuart P. Lloyd. *Least Squares Quantization in PCM.* IEEE Transactions on Information
+  Theory, 28(2):129-137, 1982. [[doi]](https://doi.org/10.1109/TIT.1982.1056489) -- the
+  algorithm itself.
+- David Arthur, Sergei Vassilvitskii. *k-means++: The Advantages of Careful Seeding.*
+  SODA 2007. [[pdf]](https://theory.stanford.edu/~sergei/papers/kMeansPP-soda.pdf) -- the
+  initialisation used here.
+
 ---
 
-### `forgetting` — Toneva et al. (2019)
+### `forgetting` — keep what the model keeps losing
 
 While the proxy trains, watch every example. A **forgetting event** is a transition from
 correctly to incorrectly classified between two consecutive presentations. Examples with
@@ -165,9 +187,14 @@ is worth reporting alongside the default.
 
 **Config:** `coreset.forgetting.order` (`descending` | `ascending`).
 
+**Reference:** Mariya Toneva, Alessandro Sordoni, Remi Tachet des Combes, Adam Trischler,
+Yoshua Bengio, Geoffrey J. Gordon. *An Empirical Study of Example Forgetting during Deep
+Neural Network Learning.* ICLR 2019.
+[[arXiv:1812.05159]](https://arxiv.org/abs/1812.05159)
+
 ---
 
-### `uncertainty`
+### `uncertainty` — keep what the model is least sure about
 
 Three classical scores over the proxy's softmax output *p*:
 
@@ -187,9 +214,18 @@ since there is no model yet.
 
 **Config:** `coreset.uncertainty.metric`, `coreset.uncertainty.order`.
 
+**References:**
+- David D. Lewis, William A. Gale. *A Sequential Algorithm for Training Text Classifiers.*
+  SIGIR 1994. [[arXiv:cmp-lg/9407020]](https://arxiv.org/abs/cmp-lg/9407020) -- the origin
+  of least-confidence uncertainty sampling.
+- Burr Settles. *Active Learning Literature Survey.* Technical Report 1648, University of
+  Wisconsin-Madison, 2009.
+  [[pdf]](https://burrsettles.com/pub/settles.activelearning.pdf) -- Section 3.1 defines
+  all three metrics used here, including margin sampling.
+
 ---
 
-### `el2n` — Paul, Ganguli & Dziugaite (2021)
+### `el2n` — the size of the error vector
 
 Score each example by the norm of its error vector early in training:
 
@@ -207,9 +243,13 @@ initialised proxies; the shipped config uses 3. This is the main cost driver of 
 **Config:** `coreset.el2n.order`, `coreset.proxy.num_models`, `coreset.proxy.epochs`
 (the paper computes the score early -- around epoch 20 -- not at convergence).
 
+**Reference:** Mansheej Paul, Surya Ganguli, Gintare Karolina Dziugaite. *Deep Learning on a
+Data Diet: Finding Important Examples Early in Training.* NeurIPS 2021.
+[[arXiv:2107.07075]](https://arxiv.org/abs/2107.07075)
+
 ---
 
-### `grand` — Paul, Ganguli & Dziugaite (2021)
+### `grand` — the size of the gradient
 
 The expected gradient-norm score, `E ‖ ∇_θ L(x, y) ‖₂`, computed here with the standard
 last-layer approximation. For cross entropy the gradient with respect to the final linear
@@ -225,6 +265,55 @@ examples. The approximation is stated here because it is the difference between 
 implementation and a full-backward one, which costs a backward pass per example.
 
 **Config:** `coreset.grand.order`, `coreset.proxy.num_models`, `coreset.proxy.epochs`.
+
+**Reference:** Mansheej Paul, Surya Ganguli, Gintare Karolina Dziugaite. *Deep Learning on a
+Data Diet: Finding Important Examples Early in Training.* NeurIPS 2021.
+[[arXiv:2107.07075]](https://arxiv.org/abs/2107.07075) -- same paper as EL2N; GraNd is its
+gradient-norm sibling.
+
+---
+
+## Measured, on this repository's protocol
+
+CIFAR10, 10 images/class, ConvNet. 3 independent selections × 5 evaluation networks =
+**15 networks per row**; proxy trained for 20 epochs (3 proxies averaged for `el2n` and
+`grand`). Produced by `configs/coreset/cifar10_ipc10_<selector>.yaml`, unmodified.
+
+| selector | accuracy (%) | vs. random |
+| --- | --- | --- |
+| `kmeans` | **39.31 ± 0.62** | +6.16 |
+| `herding` | 38.48 ± 0.64 | +5.33 |
+| `random` | 33.15 ± 1.67 | — |
+| `kcenter` | 19.84 ± 0.66 | −13.31 |
+| `uncertainty` (entropy) | 11.80 ± 0.66 | −21.35 |
+| `grand` | 11.20 ± 1.57 | −21.95 |
+| `el2n` | 11.15 ± 0.39 | −22.00 |
+| `forgetting` | 9.55 ± 0.65 | −23.60 |
+
+For scale, condensation on the same protocol reaches 48.79 (plain DM) and 51.05 (the
+released method) -- see [results.md](results.md).
+
+Three things this table shows, all of them predicted by the discussions above:
+
+1. **The representativeness methods work; the difficulty methods do not.** `kmeans` and
+   `herding` -- the two that try to *represent* the class -- beat random by 5-6 points.
+   Every difficulty-ranked method (`forgetting`, `el2n`, `grand`, `uncertainty`) lands near
+   the 10% chance level, because at 10 images per class "keep the hardest examples" selects
+   ten boundary or mislabelled images and nothing else. They are being used far outside the
+   30-70% pruning regime they were designed for; try `order: ascending` before concluding
+   anything about the methods themselves.
+2. **`kcenter` sits in between, and for the reason given above:** matching the support means
+   walking the tails, and at this budget most of the budget goes to the tails.
+3. **Random is a real baseline.** Five of the seven informed methods lose to it.
+
+Rerun any row with one command, or all of them:
+
+```bash
+for s in random herding kcenter kmeans forgetting uncertainty el2n grand; do
+    python train.py --config configs/coreset/cifar10_ipc10_$s.yaml
+done
+python scripts/collect_results.py runs
+```
 
 ---
 
@@ -258,8 +347,24 @@ this repository's condensation side is the place to compare against them.
 
 ## References
 
-- Welling. *Herding Dynamical Weights to Learn.* ICML 2009.
-- Rebuffi et al. *iCaRL: Incremental Classifier and Representation Learning.* CVPR 2017.
-- Sener & Savarese. *Active Learning for Convolutional Neural Networks: A Core-Set Approach.* ICLR 2018.
-- Toneva et al. *An Empirical Study of Example Forgetting during Deep Neural Network Learning.* ICLR 2019.
-- Paul, Ganguli & Dziugaite. *Deep Learning on a Data Diet: Finding Important Examples Early in Training.* NeurIPS 2021.
+- Max Welling. *Herding Dynamical Weights to Learn.* ICML 2009.
+  <https://icml.cc/Conferences/2009/papers/447.pdf>
+- Sylvestre-Alvise Rebuffi, Alexander Kolesnikov, Georg Sperl, Christoph H. Lampert.
+  *iCaRL: Incremental Classifier and Representation Learning.* CVPR 2017.
+  <https://arxiv.org/abs/1611.07725>
+- Ozan Sener, Silvio Savarese. *Active Learning for Convolutional Neural Networks: A
+  Core-Set Approach.* ICLR 2018. <https://arxiv.org/abs/1708.00489>
+- Stuart P. Lloyd. *Least Squares Quantization in PCM.* IEEE Trans. Information Theory,
+  28(2):129-137, 1982. <https://doi.org/10.1109/TIT.1982.1056489>
+- David Arthur, Sergei Vassilvitskii. *k-means++: The Advantages of Careful Seeding.*
+  SODA 2007. <https://theory.stanford.edu/~sergei/papers/kMeansPP-soda.pdf>
+- Mariya Toneva, Alessandro Sordoni, Remi Tachet des Combes, Adam Trischler, Yoshua Bengio,
+  Geoffrey J. Gordon. *An Empirical Study of Example Forgetting during Deep Neural Network
+  Learning.* ICLR 2019. <https://arxiv.org/abs/1812.05159>
+- David D. Lewis, William A. Gale. *A Sequential Algorithm for Training Text Classifiers.*
+  SIGIR 1994. <https://arxiv.org/abs/cmp-lg/9407020>
+- Burr Settles. *Active Learning Literature Survey.* TR 1648, University of
+  Wisconsin-Madison, 2009. <https://burrsettles.com/pub/settles.activelearning.pdf>
+- Mansheej Paul, Surya Ganguli, Gintare Karolina Dziugaite. *Deep Learning on a Data Diet:
+  Finding Important Examples Early in Training.* NeurIPS 2021.
+  <https://arxiv.org/abs/2107.07075>

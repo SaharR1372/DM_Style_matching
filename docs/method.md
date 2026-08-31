@@ -162,6 +162,28 @@ loss:
 `configs/ours/_base.yaml`. The three coefficients were calibrated once on CIFAR10 and are
 used unchanged on CIFAR100 and TinyImageNet.
 
+## Implementation note on the ICD module
+
+This release implements the ICD module in a **bounded, target-matched** form: the
+intra-class spread of the condensed class is matched to the same statistic measured on the
+real batch, rather than obtained by maximising the KL divergence to the nearest intra-class
+neighbours as written in Eq. 8-9 of the paper.
+
+The matched form is considerably more stable. It has an attainable optimum, so its weight
+does not have to be tuned per dataset or budget, and it is therefore the default in every
+shipped config. **The module's role in the pipeline is unchanged** -- it is still the
+component that keeps the `ipc` images of a class from collapsing onto one prototype; only
+the way that pressure is expressed differs.
+
+Set `loss.icd.form: kl` to recover the Eq. 8-9 formulation exactly. `configs/paper/` does
+this, so the published objective remains one command away:
+
+```bash
+python train.py --config configs/paper/cifar10_ipc10.yaml
+```
+
+The measured comparison between the two formulations is in [results.md](results.md).
+
 ## A note on scope
 
 `configs/paper` reproduces the objective as published; `configs/ours` is the configuration

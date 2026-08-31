@@ -3,6 +3,9 @@
 Official PyTorch implementation of **"Decomposed Distribution Matching in Dataset
 Condensation"**, published at **WACV 2025**.
 
+**Paper:** [Sahar Rahimi Malakshan, Mohammad Saeed Ebrahimi Saadabadi, Ali Dabouei, Nasser Nasrabadi.
+*Decomposed Distribution Matching in Dataset Condensation.* WACV 2025, pp. 7112-7122](https://openaccess.thecvf.com/content/WACV2025/html/Malakshan_Decomposed_Distribution_Matching_in_Dataset_Condensation_WACV_2025_paper.html)
+
 ## Abstract
 
 Dataset Condensation (DC) aims to reduce deep neural networks training efforts by
@@ -105,8 +108,9 @@ condensation methods, so their rows are directly comparable:
 
 `random`, `herding`, `kcenter`, `kmeans`, `forgetting`, `uncertainty`, `el2n`, `grand`.
 
-Each is documented -- what it optimises, its hyperparameters, and where it breaks down at
-condensation-sized budgets -- in [docs/coreset.md](docs/coreset.md).
+Each is documented -- what it optimises, its hyperparameters, its reference paper, and where
+it breaks down at condensation-sized budgets -- in [docs/coreset.md](docs/coreset.md), which
+also carries a measured CIFAR10 table for all eight.
 
 ## Repository layout
 
@@ -143,17 +147,6 @@ scripts/                 dataset preparation, results collection, smoke test
 | [docs/results.md](docs/results.md) | measured numbers and the protocol behind them |
 | [docs/extending.md](docs/extending.md) | adding a loss, a selector, a dataset, an architecture |
 
-## Note on the Intra-Class Diversity implementation
-
-This release implements the ICD module in a bounded, target-matched form: the intra-class
-spread of the condensed class is matched to the same statistic measured on the real batch,
-rather than obtained by maximising the KL divergence to the nearest intra-class neighbours as
-written in Eq. 8-9. We found the matched form considerably more stable -- it has an
-attainable optimum, so its weight does not have to be tuned per dataset or budget -- and it
-is the default. The module's role in the pipeline is unchanged. Set `loss.icd.form: kl` to
-recover the Eq. 8-9 formulation; `configs/paper/` does this. See
-[docs/method.md](docs/method.md) and [docs/results.md](docs/results.md).
-
 ## Distilled datasets
 
 Distilled datasets (saved as tensors) for various numbers of images per class are available
@@ -167,6 +160,18 @@ scripts to configs is in [docs/configs.md](docs/configs.md) and in the `configs/
 headers.
 
 ## Citation
+
+```bibtex
+@InProceedings{Malakshan_2025_WACV,
+    author    = {Malakshan, Sahar Rahimi and Saadabadi, Mohammad Saeed Ebrahimi and
+                 Dabouei, Ali and Nasrabadi, Nasser},
+    title     = {Decomposed Distribution Matching in Dataset Condensation},
+    booktitle = {Proceedings of the Winter Conference on Applications of Computer Vision (WACV)},
+    month     = {February},
+    year      = {2025},
+    pages     = {7112-7122}
+}
+```
 
 This repository is built upon [this repo](https://github.com/VICO-UoE/DatasetCondensation).
 If you use the code or methods from this repository, please cite their work as well.

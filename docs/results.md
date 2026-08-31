@@ -98,16 +98,34 @@ run.
 
 ## Coreset baselines
 
-The eight selectors in [coreset.md](coreset.md) ship with configs but without a results
-table -- they are provided so a reader can measure them under this repository's exact
-protocol rather than importing numbers from another paper's setup. One command each:
+CIFAR10, 10 images/class, ConvNet. 3 independent selections × 5 evaluation networks =
+**15 networks per row**; proxy trained for 20 epochs (3 proxies averaged for `el2n` and
+`grand`). Same evaluation protocol as the condensation rows above, so these numbers sit on
+the same scale.
 
-```bash
-for s in random herding kcenter kmeans forgetting uncertainty el2n grand; do
-    python train.py --config configs/coreset/cifar10_ipc10_$s.yaml
-done
-python scripts/collect_results.py runs --out results_table.md
-```
+| config | selector | accuracy (%) |
+| --- | --- | --- |
+| `configs/coreset/cifar10_ipc10_kmeans.yaml` | kmeans | **39.31 ± 0.62** |
+| `configs/coreset/cifar10_ipc10_herding.yaml` | herding | 38.48 ± 0.64 |
+| `configs/coreset/cifar10_ipc10_random.yaml` | random | 33.15 ± 1.67 |
+| `configs/coreset/cifar10_ipc10_kcenter.yaml` | kcenter | 19.84 ± 0.66 |
+| `configs/coreset/cifar10_ipc10_uncertainty.yaml` | uncertainty (entropy) | 11.80 ± 0.66 |
+| `configs/coreset/cifar10_ipc10_grand.yaml` | grand | 11.20 ± 1.57 |
+| `configs/coreset/cifar10_ipc10_el2n.yaml` | el2n | 11.15 ± 0.39 |
+| `configs/coreset/cifar10_ipc10_forgetting.yaml` | forgetting | 9.55 ± 0.65 |
+
+**Synthesis beats selection by a wide margin at this budget.** The best coreset method
+reaches 39.31; plain distribution matching reaches 48.79 and the released method 51.05.
+That gap -- 11.7 points over the strongest selection baseline -- is what being allowed to
+*synthesise* images rather than only pick them is worth here.
+
+The `herding` row is the most informative comparison: it minimises the same class-mean
+discrepancy that L_MMD does, restricted to real images. The 10.3-point gap between it and
+plain DM is therefore close to a clean measurement of the value of the larger search space,
+with the objective held fixed.
+
+Why the difficulty-ranked methods land near chance, and what to try instead, is discussed in
+[coreset.md](coreset.md).
 
 ## Reproducing
 
