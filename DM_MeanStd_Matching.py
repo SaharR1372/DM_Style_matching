@@ -178,6 +178,10 @@ def main():
             loss = torch.tensor(0.0).to(args.device)
             style_loss = torch.tensor(0.0).to(args.device)
             for c in range(num_classes):
+                # style_loss is reset per class: when it was only initialised outside this
+                # loop, each class's style loss was re-added (damped by 1/n_layers) for every
+                # later class, weighting the early classes ~1.5x more than the late ones.
+                style_loss = torch.tensor(0.0).to(args.device)
                 img_real = get_images(c, args.batch_real)
                 img_syn = image_syn[c*args.ipc:(c+1)*args.ipc].reshape((args.ipc, channel, im_size[0], im_size[1]))
 
