@@ -124,11 +124,6 @@ class ConvNet(nn.Module):
                 shape_feat[2] //= 2
 
         return nn.Sequential(*layers), shape_feat
-class Flatten(nn.Module):
-    def forward(self, input):
-        return input.view(input.size(0), -1)
-
-
 ''' ConvNet_style '''
 class ConvNet_style(nn.Module):
     def __init__(self, channel, num_classes, net_width, net_depth, net_act, net_norm, net_pooling, im_size = (32,32)):
@@ -137,6 +132,25 @@ class ConvNet_style(nn.Module):
         self.features, self.layer_outputs,shape_feat = self._make_layers(channel, net_width, net_depth, net_norm, net_act, net_pooling, im_size)
         num_feat = shape_feat[0]*shape_feat[1]*shape_feat[2]
         self.classifier = nn.Linear(num_feat, num_classes)
+        # Where along each block the "style" feature maps are read.
+        # 'norm' reproduces the published behaviour (output of the GroupNorm/InstanceNorm
+        # layer).  Note that with the default net_norm='instancenorm' those maps have
+        # per-sample per-channel spatial mean 0 and std 1 by construction, so per-sample
+        # first/second moments carry no information there; 'conv' taps the convolution
+        # output instead, before normalisation, where they do.
+        self.style_tap = 'norm'
+
+    _TAP_TYPES = {
+        'norm': nn.GroupNorm,
+        'conv': nn.Conv2d,
+        'act': (nn.ReLU, nn.LeakyReLU, nn.Sigmoid),
+        'pool': (nn.AvgPool2d, nn.MaxPool2d),
+    }
+
+    def set_style_tap(self, tap):
+        if tap not in self._TAP_TYPES:
+            raise ValueError('unknown style_tap %r, expected one of %s' % (tap, sorted(self._TAP_TYPES)))
+        self.style_tap = tap
 
     def forward(self, x):
         out = self.features(x)
@@ -148,13 +162,12 @@ class ConvNet_style(nn.Module):
 
         layer_outputs = []  # To store intermediate layer outputs
         out = x
+        tap_type = self._TAP_TYPES[getattr(self, 'style_tap', 'norm')]
 
         for layer_idx, layer in enumerate(self.features):
-            
+
             out = layer(out)
-            # Store outputs of specified layers (e.g., GroupNorm layers in this case)
-            #options:  nn.Conv2d, nn.ReLU ,nn.GroupNorm, nn.AvgPool2d
-            if isinstance(layer ,nn.GroupNorm):
+            if isinstance(layer, tap_type):
                 layer_outputs.append(out)
 
         out = out.view(out.size(0), -1)
@@ -698,7 +711,11 @@ class ResNet(nn.Module):
         self.layer2 = self._make_layer(block, 128, num_blocks[1], stride=2)
         self.layer3 = self._make_layer(block, 256, num_blocks[2], stride=2)
         self.layer4 = self._make_layer(block, 512, num_blocks[3], stride=2)
-        self.classifier = nn.Linear(512 * 4, num_classes)
+        # 512*4 assumes a 64x64 input: avg_pool2d(.,4) then leaves a 2x2 map.  On CIFAR's
+        # 32x32 the map is 1x1 after the same pooling, so the classifier saw 2048 inputs and
+        # was handed 512 -- ResNet was not constructible on CIFAR at all.  ResNet_style
+        # already carries this fix; it was never backported here.
+        self.classifier = nn.Linear(512 * block.expansion, num_classes)
 
     def _make_layer(self, block, planes, num_blocks, stride):
         strides = [stride] + [1]*(num_blocks-1)
@@ -714,7 +731,8 @@ class ResNet(nn.Module):
         out = self.layer2(out)
         out = self.layer3(out)
         out = self.layer4(out)
-        out = F.avg_pool2d(out, 4)
+        # adaptive so the head matches whatever spatial size the input implies
+        out = F.adaptive_avg_pool2d(out, 1)
         out = out.view(out.size(0), -1)
         out = self.classifier(out)
         return out
@@ -725,7 +743,8 @@ class ResNet(nn.Module):
         out = self.layer2(out)
         out = self.layer3(out)
         out = self.layer4(out)
-        out = F.avg_pool2d(out, 4)
+        # kept consistent with forward() above
+        out = F.adaptive_avg_pool2d(out, 1)
         out = out.view(out.size(0), -1)
         return out
 
