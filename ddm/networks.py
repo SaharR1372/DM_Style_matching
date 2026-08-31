@@ -1,11 +1,8 @@
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torch
-import math
-import torch.nn as nn
-import torch.nn.functional as F
 from collections import namedtuple
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
 
 ''' Swish activation '''
