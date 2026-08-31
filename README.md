@@ -18,23 +18,55 @@ Install packages in the requirements file.
 
 ## Usage
 
-To run distribution matching with Style Matching (using Gram or Correlation Matching loss), use the following command:
+### Full method
+
+`DM_DDM.py` runs the complete objective -- content matching, the Style Matching module
+(Moments Matching + Correlation Matching) and the Intra-Class Diversity module -- from a
+single entry point:
+
 ```
-python DM_GramMatching.py  --dataset CIFAR10  --model ConvNet_style  --ipc 10  --dsa_strategy color_crop_cutout_flip_scale_rotate  --init real   --Iteration 20000 --num_exp 5  --num_eval 5  --save_path result_cifar10_DM_StyleMatching   --style_ratio 10000
+python DM_DDM.py --preset ours --dataset CIFAR10 --ipc 10 --model ConvNet_style \
+    --dsa_strategy color_crop_cutout_flip_scale_rotate --init real \
+    --Iteration 20000 --num_exp 3 --num_eval 10 --save_path result_cifar10_ours
 # --dataset: CIFAR10, CIFAR100, TinyImageNet
 # --ipc (images/class): 1, 10, 50
-#--model: ConvNet_style, ResNet18_style, AlexNet_style, VGG11_style
+# --model:  ConvNet_style, ResNet18_style, AlexNet_style, VGG11_style
 ```
 
-To run distribution matching with Style Matching (using Moments Matching loss), use the following command:
+Presets: `dm` (plain distribution matching, the baseline), `paper` (the objective as
+specified in the paper), `ours` (the released configuration). Individual terms are
+controlled by `--mm_ratio`, `--cm_ratio`, `--icd_ratio` and `--icd_style_ratio`, so any
+ablation is a flag combination; `--net_depth` defaults to ConvNetD4 at 64x64 (TinyImageNet)
+and ConvNetD3 at 32x32.
+
+### Individual modules
+
+Each module of the pipeline also has its own script, matching the figure above.
+
+Style Matching, correlation (Gram) form:
+```
+python DM_GramMatching.py  --dataset CIFAR10  --model ConvNet_style  --ipc 10  --dsa_strategy color_crop_cutout_flip_scale_rotate  --init real   --Iteration 20000 --num_exp 5  --num_eval 5  --save_path result_cifar10_DM_StyleMatching   --style_ratio 10000
+```
+
+Style Matching, moments form:
 ```
 python DM_MeanStd_Matching.py  --dataset CIFAR10  --model ConvNet_style  --ipc 10  --dsa_strategy color_crop_cutout_flip_scale_rotate  --init real   --Iteration 10000 --num_exp 5  --num_eval 5  --save_path result_cifar10_DM_StyleMatching   --style_ratio 10000
 ```
 
-To run distribution matching while promoting intra-class diversity (using Intra-Class Diversity loss), use the following command:
+Intra-Class Diversity:
 ```
-python DM_KNearest.py  --dataset CIFAR10  --model ConvNet  --ipc 10  --dsa_strategy color_crop_cutout_flip_scale_rotate  --init real   --Iteration 20000 --num_exp 5  --num_eval 5  --save_path result_cifar10_DM_KNearest --icd_ratio 10
+python DM_KNearest.py  --dataset CIFAR10  --model ConvNet  --ipc 10  --dsa_strategy color_crop_cutout_flip_scale_rotate  --init real   --Iteration 20000 --num_exp 5  --num_eval 5  --save_path result_cifar10_DM_KNearest --icd_ratio 30
 ```
+
+### Note on the Intra-Class Diversity implementation
+
+This release implements the ICD module in a bounded, target-matched form: the intra-class
+spread of the condensed class is matched to the same statistic measured on the real batch,
+rather than obtained by maximising the KL divergence to the nearest intra-class neighbours
+as written in Eq. 8-9. We found the matched form considerably more stable -- it has an
+attainable optimum, so its weight does not have to be tuned per dataset or budget -- and it
+is the default in both `DM_DDM.py` and `DM_KNearest.py`. The module's role in the pipeline
+is unchanged. Pass `--icd_form kl` to either script to recover the Eq. 8-9 formulation.
 
 ## Distilled Datasets 
 We provide various Distilled datasets (saved as tensors) with different numbers of images per class. You can access them [here](https://drive.google.com/drive/folders/1zq8YNzUoTd2N0kuGTZLwDjFuSCOo8Fih?usp=drive_link).
