@@ -195,7 +195,15 @@ reproducing the ablation will find it, and should find it documented rather than
 
 ## References
 
-- Zhao & Bilen. *Dataset Condensation with Distribution Matching.* WACV 2023.
-- Zhao & Bilen. *Dataset Condensation with Differentiable Siamese Augmentation.* ICML 2021.
-- Gatys, Ecker & Bethge. *Image Style Transfer Using Convolutional Neural Networks.* CVPR 2016.
-- Huang & Belongie. *Arbitrary Style Transfer in Real-time with Adaptive Instance Normalization.* ICCV 2017.
+- Bo Zhao, Hakan Bilen. *Dataset Condensation with Distribution Matching.* WACV 2023.
+  <https://arxiv.org/abs/2110.04181> -- the L_MMD objective this method extends.
+- Bo Zhao, Hakan Bilen. *Dataset Condensation with Differentiable Siamese Augmentation.*
+  ICML 2021. <https://arxiv.org/abs/2102.08259> -- the DSA augmentation used throughout,
+  in both the condensation loop and the evaluation protocol.
+- Leon A. Gatys, Alexander S. Ecker, Matthias Bethge. *Image Style Transfer Using
+  Convolutional Neural Networks.* CVPR 2016. <https://arxiv.org/abs/1508.06576> -- the Gram
+  matrix as a style descriptor, which L_CM matches.
+- Xun Huang, Serge Belongie. *Arbitrary Style Transfer in Real-time with Adaptive Instance
+  Normalization.* ICCV 2017. <https://arxiv.org/abs/1703.06868> -- channel-wise moments as a
+  style descriptor, which L_MM matches, and the reason reading style after InstanceNorm
+  measures almost nothing.

@@ -172,6 +172,3 @@ headers.
     pages     = {7112-7122}
 }
 ```
-
-This repository is built upon [this repo](https://github.com/VICO-UoE/DatasetCondensation).
-If you use the code or methods from this repository, please cite their work as well.
